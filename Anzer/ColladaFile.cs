@@ -138,11 +138,11 @@ namespace Anzer
                 joints.id = controller.id + "_joints";
                 var nameArray = (joints.Item = new Name_array()) as Name_array;
                 nameArray.id = joints.id + "_array";
-                nameArray.count = (ulong)mesh.BoneCount;
-                nameArray.Values = bones.Select(b => b.Name).ToArray();
+                nameArray.count = (ulong)file.Bones.Count();
+                nameArray.Values = file.Bones.Select(b => b.Name).ToArray();
                 joints.technique_common = new sourceTechnique_common();
                 joints.technique_common.accessor = new accessor();
-                joints.technique_common.accessor.count = (ulong) mesh.BoneCount;
+                joints.technique_common.accessor.count = (ulong) file.Bones.Count();
                 joints.technique_common.accessor.source = "#" + nameArray.id;
                 joints.technique_common.accessor.stride = 1;
                 joints.technique_common.accessor.param = new param[] { new param(){ name="JOINT", type = "name" } };
@@ -152,14 +152,14 @@ namespace Anzer
                 binds.id = controller.id + "_binds";
                 var floatArray = (binds.Item = new float_array()) as float_array;
                 floatArray.id = binds.id + "_array";
-                floatArray.count = (ulong)mesh.BoneCount * 16;
-                floatArray.Values = bones.Select(b => new double[]{ b.Matrix[0], b.Matrix[1], b.Matrix[2], b.Matrix[3],
+                floatArray.count = (ulong)file.Bones.Count() * 16;
+                floatArray.Values = file.Bones.Select(b => new double[]{ b.Matrix[0], b.Matrix[1], b.Matrix[2], b.Matrix[3],
                                                                     b.Matrix[4], b.Matrix[5], b.Matrix[6], b.Matrix[7],
                                                                     b.Matrix[8], b.Matrix[9], b.Matrix[10], b.Matrix[11],
                                                                     b.Matrix[12], b.Matrix[13], b.Matrix[14], b.Matrix[15]}).SelectMany(y => y).ToArray();
                 binds.technique_common = new sourceTechnique_common();
                 binds.technique_common.accessor = new accessor();
-                binds.technique_common.accessor.count = (ulong)mesh.BoneCount;
+                binds.technique_common.accessor.count = (ulong)file.Bones.Count();
                 binds.technique_common.accessor.source = "#" + floatArray.id;
                 binds.technique_common.accessor.stride = 16;
                 binds.technique_common.accessor.param = new param[] { new param() { name = "TRANSFORM", type = "float4x4" } };
@@ -204,6 +204,7 @@ namespace Anzer
                     },
                     new InputLocalOffset() {
                         semantic = "WEIGHT",
+                        offset = 1,
                         source = weights.id
                     }
                 };
@@ -212,14 +213,14 @@ namespace Anzer
                 string vArr = "";
                 int c = 0;
                 foreach(var v in mesh.Vertices) {
-                    var vBones = new float[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0);
+                    var vBones = new int[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0);
                     var vWeights = new float[] {v.w1, v.w2, v.w3, v.w4};
 
                     vcount += vBones.Count() + " ";
 
                     for (int i = 0; i < vBones.Count(); i++)
                     {
-                        vArr += vBones.ElementAt(i) + " " + (c * 4 + i) + " ";
+                        vArr += mesh.Bones[vBones.ElementAt(i)] + " " + (c * 4 + i) + " ";
                     }
                     c++;
                 }
@@ -439,12 +440,12 @@ namespace Anzer
             }
 
             collada.Items = new object[]{
-                geometryLib,
-                sceneLib,
                 imageLib,
-                materialLib,
                 fxLib,
-                controllerLib
+                materialLib,
+                geometryLib,
+                controllerLib,
+                sceneLib,
             };
             
             collada.scene = new COLLADAScene();
@@ -464,7 +465,7 @@ namespace Anzer
                 {
                     node node = new Collada141.node();
                     node.id = bone.Name + "-node";
-                    node.sid = "Bone" + (j+1);
+                    node.sid = bone.Name;
                     node.name = bone.Name;
                     node.ItemsElementName = new ItemsChoiceType2[] {
                         ItemsChoiceType2.matrix
