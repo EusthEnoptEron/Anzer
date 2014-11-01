@@ -1,6 +1,7 @@
 ﻿using Collada141;
 using ImageMagick;
 using Models.ANZ;
+using OpenTK;
 using System;
 using System.Collections.Generic;
 using System.Drawing.Imaging;
@@ -132,34 +133,36 @@ namespace Anzer
                 skin.source1 = "#"+geometry.id;
                 skin.bind_shape_matrix = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
 
-                var bones = file.Bones.Where((bone, i) => mesh.Bones.Contains(i));
+                //var bones = file.Bones.Where((bone, i) => mesh.Bones.Contains(i));
+                var bones = new List<ANZBoneData>();
+                foreach(int b in mesh.Bones) {
+                    bones.Add(this.bones[b]);
+                }
+
                 // JOINTS
                 var joints = new source();
                 joints.id = controller.id + "_joints";
                 var nameArray = (joints.Item = new Name_array()) as Name_array;
                 nameArray.id = joints.id + "_array";
-                nameArray.count = (ulong)file.Bones.Count();
-                nameArray.Values = file.Bones.Select(b => b.Name).ToArray();
+                nameArray.count = (ulong)bones.Count();
+                nameArray.Values = bones.Select(b => b.Name).ToArray();
                 joints.technique_common = new sourceTechnique_common();
                 joints.technique_common.accessor = new accessor();
-                joints.technique_common.accessor.count = (ulong) file.Bones.Count();
+                joints.technique_common.accessor.count = (ulong)bones.Count();
                 joints.technique_common.accessor.source = "#" + nameArray.id;
                 joints.technique_common.accessor.stride = 1;
                 joints.technique_common.accessor.param = new param[] { new param(){ name="JOINT", type = "name" } };
                 
                 // BIND POSES
                 var binds = new source();
-                binds.id = controller.id + "_binds";
+                binds.id = controller.id + "_poses";
                 var floatArray = (binds.Item = new float_array()) as float_array;
                 floatArray.id = binds.id + "_array";
-                floatArray.count = (ulong)file.Bones.Count() * 16;
-                floatArray.Values = file.Bones.Select(b => new double[]{ b.Matrix[0], b.Matrix[1], b.Matrix[2], b.Matrix[3],
-                                                                    b.Matrix[4], b.Matrix[5], b.Matrix[6], b.Matrix[7],
-                                                                    b.Matrix[8], b.Matrix[9], b.Matrix[10], b.Matrix[11],
-                                                                    b.Matrix[12], b.Matrix[13], b.Matrix[14], b.Matrix[15]}).SelectMany(y => y).ToArray();
+                floatArray.count = (ulong)bones.Count() * 16;
+                floatArray.Values = bones.Select((b, i) => getWorldMatrix(mesh.Bones[i]).AsDoubles()).SelectMany(y => y).ToArray();
                 binds.technique_common = new sourceTechnique_common();
                 binds.technique_common.accessor = new accessor();
-                binds.technique_common.accessor.count = (ulong)file.Bones.Count();
+                binds.technique_common.accessor.count = (ulong)bones.Count();
                 binds.technique_common.accessor.source = "#" + floatArray.id;
                 binds.technique_common.accessor.stride = 16;
                 binds.technique_common.accessor.param = new param[] { new param() { name = "TRANSFORM", type = "float4x4" } };
@@ -200,7 +203,7 @@ namespace Anzer
                 skin.vertex_weights.input = new InputLocalOffset[] { 
                     new InputLocalOffset() {
                         semantic = "JOINT",
-                        source   = joints.id
+                        source   = "#" + joints.id
                     },
                     new InputLocalOffset() {
                         semantic = "WEIGHT",
@@ -218,9 +221,9 @@ namespace Anzer
 
                     for (int i = 0; i < vBones.Count(); i++)
                     {
-                        int index = mesh.Bones[vBones.ElementAt(i)];
+                        //int index = mesh.Bones[vBones.ElementAt(i)];
 
-                        vArr += mesh.Bones[vBones.ElementAt(i)] + " " + (c * 4 + i) + " ";
+                        vArr += vBones.ElementAt(i) + " " + (c * 4 + i) + " ";
                     }
 
                     c++;
@@ -458,6 +461,7 @@ namespace Anzer
 
         private node[] makeNodes(int boneId)
         {
+
             List<node> nodes = new List<node>();
             int j = 0;
             foreach (var bone in bones)
@@ -472,11 +476,11 @@ namespace Anzer
                     node.ItemsElementName = new ItemsChoiceType2[] {
                         ItemsChoiceType2.matrix
                     };
-                    node.Items = new object[]{
-                       /* new matrix() {
+                    node.Items = new object[] {
+                        new matrix() {
                              sid="transform",
-                             Values = bone.Matrix.Where((v, i) => i <= 15).Select(v => (double)v).ToArray()
-                        }*/
+                             Values = getMatrix(bone.Matrix).AsDoubles()
+                        }
                     };
                     node.node1 = makeNodes(j);
                     nodes.Add(node);
@@ -485,6 +489,54 @@ namespace Anzer
             }
 
             return nodes.ToArray();
+        }
+
+        private Matrix4 getWorldMatrix(int boneId)
+        {
+            if (boneId < 0) return Matrix4.Identity;
+
+            var bone = bones[boneId];
+
+            var m = getMatrix(bone.Matrix);
+            m.Invert();
+            return Matrix4.Mult(m, getWorldMatrix(bone.Value[0]));
+        }
+
+
+        private Matrix4 getMatrix(float[] v, bool scaled = true)
+        {
+            var m = new Matrix4(v[0], v[1], v[2], v[3],
+                                v[4], v[5], v[6], v[7],
+                                v[8], v[9], v[10], v[11],
+                                v[12], v[13], v[14], v[15]);
+            m.Transpose();
+            if (scaled)
+            {
+                /*var scaleMatrix = Matrix4.Scale(0.1f);
+                m = Matrix4.Mult(scaleMatrix, m);*/
+                m.M14 *= Scale;
+                m.M24 *= Scale;
+                m.M34 *= Scale;
+            }
+
+            return m;
+        }
+
+    }
+
+    public static class Matrix4Extension {
+        public static float[] AsFloats(this Matrix4 m)
+        {
+            return new float[] {
+                m.M11, m.M12, m.M13, m.M14,
+                m.M21, m.M22, m.M23, m.M24,
+                m.M31, m.M32, m.M33, m.M34,
+                m.M41, m.M42, m.M43, m.M44
+            };
+        }
+        public static double[] AsDoubles(this Matrix4 m)
+        {
+            return m.AsFloats().Select(v => (double)v).ToArray();
         }
     }
 }
