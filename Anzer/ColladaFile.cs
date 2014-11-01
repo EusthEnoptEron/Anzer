@@ -168,18 +168,18 @@ namespace Anzer
                 var weights = new source();
                 weights.id = controller.id + "_weights";
                 var weightArray = (weights.Item = new float_array()) as float_array;
-                weightArray.id = binds.id + "_array";
+                weightArray.id = weights.id + "_array";
                 weightArray.count = (ulong)mesh.Vertices.Count * 4;
-                weightArray.Values = mesh.Vertices.Select(v => new double[] { v.w1/100, v.w2/100, v.w3/100, v.w4/100 })
+                weightArray.Values = mesh.Vertices.Select(v => new double[] { v.w1/100f, v.w2/100f, v.w3/100f, v.w4/100f })
                                                   .SelectMany(y => y).ToArray();
 
                 weights.technique_common = new sourceTechnique_common();
                 weights.technique_common.accessor = new accessor();
-                weights.technique_common.accessor.count = (ulong)mesh.Vertices.Count;
+                weights.technique_common.accessor.count = (ulong)mesh.Vertices.Count * 4;
                 weights.technique_common.accessor.source = "#" + weightArray.id;
                 weights.technique_common.accessor.stride = 1;
                 weights.technique_common.accessor.param = new param[] { new param() { name = "WEIGHT", type = "float" } };
-                
+                int before = mesh.Vertices.Count;
 
                 skin.source = new source[] { joints, binds, weights };
 
@@ -195,7 +195,7 @@ namespace Anzer
                         source  = "#" + binds.id
                     }
                 };
-
+               
                 skin.vertex_weights = new skinVertex_weights();
                 skin.vertex_weights.input = new InputLocalOffset[] { 
                     new InputLocalOffset() {
@@ -205,7 +205,7 @@ namespace Anzer
                     new InputLocalOffset() {
                         semantic = "WEIGHT",
                         offset = 1,
-                        source = weights.id
+                        source = "#" + weights.id
                     }
                 };
 
@@ -214,20 +214,22 @@ namespace Anzer
                 int c = 0;
                 foreach(var v in mesh.Vertices) {
                     var vBones = new int[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0);
-                    var vWeights = new float[] {v.w1, v.w2, v.w3, v.w4};
-
                     vcount += vBones.Count() + " ";
 
                     for (int i = 0; i < vBones.Count(); i++)
                     {
+                        int index = mesh.Bones[vBones.ElementAt(i)];
+
                         vArr += mesh.Bones[vBones.ElementAt(i)] + " " + (c * 4 + i) + " ";
                     }
+
                     c++;
                 }
 
                 skin.vertex_weights.count = (ulong)mesh.Vertices.Count;
                 skin.vertex_weights.vcount = vcount;
                 skin.vertex_weights.v = vArr;
+                int after = mesh.Vertices.Count;
 
 
                 controllers.Add(controller);
@@ -358,7 +360,7 @@ namespace Anzer
 
             source.technique_common = new sourceTechnique_common();
             source.technique_common.accessor = new accessor();
-            source.technique_common.accessor.source = floatArray.id;
+            source.technique_common.accessor.source = "#" + floatArray.id;
             source.technique_common.accessor.stride = (ulong)labels.Length;
             source.technique_common.accessor.count = (ulong)vertices.Count();
             source.technique_common.accessor.param = labels.Select(str => new param() { name = str, type = "float" }).ToArray();
@@ -451,7 +453,6 @@ namespace Anzer
             collada.scene = new COLLADAScene();
             collada.scene.instance_visual_scene = new InstanceWithExtra() { url = "#scene" };
 
-
             collada.Save(file);
         }
 
@@ -467,14 +468,15 @@ namespace Anzer
                     node.id = bone.Name + "-node";
                     node.sid = bone.Name;
                     node.name = bone.Name;
+                    node.type = NodeType.JOINT;
                     node.ItemsElementName = new ItemsChoiceType2[] {
                         ItemsChoiceType2.matrix
                     };
                     node.Items = new object[]{
-                        new matrix() {
+                       /* new matrix() {
                              sid="transform",
                              Values = bone.Matrix.Where((v, i) => i <= 15).Select(v => (double)v).ToArray()
-                        }
+                        }*/
                     };
                     node.node1 = makeNodes(j);
                     nodes.Add(node);
