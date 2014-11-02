@@ -46,5 +46,13 @@ namespace Anzer
                 return values[index];
             }
         }
+
+        public Vector3 Inverted
+        {
+            get
+            {
+                return new Vector3() { x = -x, y = -y, z = -z };
+            }
+        }
     }
 }

@@ -53,7 +53,7 @@ namespace Anzer
 
 
                 // Export vertex normals
-                var normals = generateSource(mesh.Vertices.Select(v => new Vector3() { x = v.nx, y = v.ny, z = v.nz }),
+                var normals = generateSource(mesh.Vertices.Select(v => new Vector3() { x = v.nx, y = v.ny, z = v.nz }.Inverted),
                     new String[] { "X", "Y", "Z" }, geometry.id + "_normals");
 
                 // Export vertex uvs
@@ -182,8 +182,7 @@ namespace Anzer
                 weights.technique_common.accessor.source = "#" + weightArray.id;
                 weights.technique_common.accessor.stride = 1;
                 weights.technique_common.accessor.param = new param[] { new param() { name = "WEIGHT", type = "float" } };
-                int before = mesh.Vertices.Count;
-
+  
                 skin.source = new source[] { joints, binds, weights };
 
                 skin.joints = new skinJoints();
@@ -216,14 +215,14 @@ namespace Anzer
                 string vArr = "";
                 int c = 0;
                 foreach(var v in mesh.Vertices) {
-                    var vBones = new int[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0);
-                    vcount += vBones.Count() + " ";
+                    var vBones = new int[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0).ToArray();
+                    vcount += vBones.Length + " ";
 
-                    for (int i = 0; i < vBones.Count(); i++)
+                    for (int i = 0; i < vBones.Length; i++)
                     {
                         //int index = mesh.Bones[vBones.ElementAt(i)];
 
-                        vArr += vBones.ElementAt(i) + " " + (c * 4 + i) + " ";
+                        vArr += vBones[i] + " " + (c * 4 + i) + " ";
                     }
 
                     c++;
@@ -232,7 +231,6 @@ namespace Anzer
                 skin.vertex_weights.count = (ulong)mesh.Vertices.Count;
                 skin.vertex_weights.vcount = vcount;
                 skin.vertex_weights.v = vArr;
-                int after = mesh.Vertices.Count;
 
 
                 controllers.Add(controller);
@@ -411,6 +409,22 @@ namespace Anzer
             var sceneLib = new library_visual_scenes();
             sceneLib.visual_scene = new visual_scene[] { new visual_scene() };
             sceneLib.visual_scene[0].id = "scene";
+
+            //nodes.AddRange(makeNodes(-1));
+
+            //int count = 0;
+            //nodes.AddRange(controllerInstances.Select((c) =>
+            //{
+            //    return new node()
+            //    {
+            //        type = NodeType.NODE,
+            //        id ="node-" + ++count,
+            //        name = "node-" + count,
+            //        instance_controller = new instance_controller[]{ c },
+            //        // instance_geometry = geometryInstances.ToArray(),
+            //    };
+            //}));
+            //sceneLib.visual_scene[0].node = nodes.ToArray();
             sceneLib.visual_scene[0].node = new node[] {
                 makeNodes(-1)[0],
                 new node()
