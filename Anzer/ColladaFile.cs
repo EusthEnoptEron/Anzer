@@ -3,6 +3,7 @@ using ImageMagick;
 using Models.ANZ;
 using OpenTK;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Drawing.Imaging;
 using System.IO;
@@ -24,6 +25,10 @@ namespace Anzer
         private Dictionary<string, ANZTextureData> textures = new Dictionary<string, ANZTextureData>();
         private List<ANZBoneData> bones = new List<ANZBoneData>();
         private Dictionary<string, int> boneMap = new Dictionary<string, int>();
+        private List<animation> animations = new List<animation>();
+
+        private string[] blacklist = { "L_moemoe_bone", "L_moemoe_nub", "R_moemoe_bone", "R_moemoe_nub" };
+
         private int counter = 0;
         public float Scale { get; private set; }
 
@@ -31,16 +36,85 @@ namespace Anzer
         {
             Scale = scale;
         }
+        public void AddMotion(ANZFile motion)
+        {
+            //SRT:
+                // 3 = xrot
+                // 4 = yrot
+                // 5 = zrot
+                // 6 = transx
+                // 7 = transy
+                // 8 = transz
+
+            var name = (new FileInfo(motion.FileName.Replace(".anz", "")).Name);
+            var rootAnimation = new animation()
+            {
+                id = name + "_anim",
+                name = name
+            };
+            var animChildren = new List<animation>();
+
+            int counter = 0;
+            foreach (var anim in motion.Anims)
+            {
+                string aName = name + "_" + ++counter + "_anim";
+
+                var animation = new animation()
+                {
+                     id = aName,
+                     name = name + "_" + counter
+                };
+
+                animation.Items = anim.Objects.Select(GenerateAnimation).Where(v => v != null).ToArray();
+
+                animChildren.Add(animation);
+            }
+
+            rootAnimation.Items = animChildren.ToArray();
+
+            animations.Add(rootAnimation);
+        }
+
+        private ANZAnimData GenerateAnimation(ANZAnimData.Object anim)
+        {
+            if (anim.No != 1) return null;
+            var animation = new animation()
+            {
+                id = anim.Name + "-transform"
+            };
+
+            //Matrix4 mat = Matrix4.Identity;
+            //SortedList<float, float> times = new SortedList<float, float>();
+
+            //if(anim.SRT[3].Flags == 0x01)
+            //    foreach(var keyframe in anim.SRT[3].KeyFrames) {
+                    
+            //    }
+            //else {
+
+            //}
+
+
+            return null;
+        }
 
         public void AddAnz(ANZFile file)
         {
             registerTextures(file);
             registerBones(file);
 
+
+            List<instance_controller> controllerInstances = new List<instance_controller>();
+
             foreach (var mesh in file.Meshes)
             {
+
                 var texture = getTexture(file, mesh);
                 var geometry = new geometry();
+                var localBlacklist = mesh.Bones.Select((bIdx,i) => i).Where(bIdx =>
+                {
+                    return blacklist.Contains(file.Bones[mesh.Bones[bIdx]].Name);
+                });
 
                 geometry.id = "mesh" + counter++;
                 geometry.name = getTextureName(texture);
@@ -76,7 +150,7 @@ namespace Anzer
 
                 polylist.count = (ulong)mesh.FaceCount;
                 polylist.vcount = polylist.p = "";
-                polylist.material = getTextureName(texture);
+                polylist.material = getMatName(texture);
                 polylist.vcount = string.Join("3 ", new string[mesh.FaceCount + 1]).Trim();
 
 
@@ -125,7 +199,7 @@ namespace Anzer
                 // Do bones
                 var controller = new controller();
                 controller.id = "Armature-" + geometry.id;
-                controller.name = "Armature";
+                controller.name = controller.id;
 
                 var skin = new skin();
                 controller.Item = skin;
@@ -173,8 +247,18 @@ namespace Anzer
                 var weightArray = (weights.Item = new float_array()) as float_array;
                 weightArray.id = weights.id + "_array";
                 weightArray.count = (ulong)mesh.Vertices.Count * 4;
-                weightArray.Values = mesh.Vertices.Select(v => new double[] { v.w1/100f, v.w2/100f, v.w3/100f, v.w4/100f })
-                                                  .SelectMany(y => y).ToArray();
+                weightArray.Values = mesh.Vertices.Select(v => {
+                    var bns = new int[] { v.b1, v.b2, v.b3, v.b4 };
+                    var wts = new int[] { v.w1, v.w2, v.w3, v.w4 };
+                    float sum = 0;
+                    for (int idx = 0; idx < bns.Length; idx++)
+                        if (localBlacklist.Contains(bns[idx]))
+                            wts[idx] = 0;
+                        else
+                            sum += wts[idx];
+
+                    return new double[] { wts[0] / sum, wts[1] / sum, wts[2] / sum, wts[3] / sum };
+                }).SelectMany(y => y).ToArray();
 
                 weights.technique_common = new sourceTechnique_common();
                 weights.technique_common.accessor = new accessor();
@@ -238,7 +322,7 @@ namespace Anzer
                 controllerInstances.Add(new instance_controller()
                 {
                     url = "#" + controller.id,
-                    skeleton = new string[]{ "#" + this.bones.ElementAt(0).Name + "-node" },
+                    skeleton = new string[]{ "#" + this.bones.ElementAt(0).Name }, //+ "-node" },
                     bind_material = new bind_material()
                     {
                         technique_common = new instance_material[]{
@@ -252,6 +336,21 @@ namespace Anzer
                 });
 
             }
+
+            nodes.Add(new node()
+            {
+                type = NodeType.NODE,
+                id = getName(file) + "-node",
+                sid = getName(file) + "-node",
+                instance_controller = controllerInstances.ToArray(),
+                // instance_geometry = geometryInstances.ToArray(),
+                name = getName(file)
+            });
+        }
+
+        private string getMatName(ANZTextureData texture)
+        {
+            return getTextureName(texture) + "_mat";
         }
 
         private void registerBones(ANZFile file)
@@ -284,13 +383,13 @@ namespace Anzer
                     textures.Add(name, texture);
 
                     // add to images
-                    var img = new image() { id = name + ".png" };
-                    img.Item =  "./Materials/" + name + ".png";
+                    var img = new image() { id = name + "_png" };
+                    img.Item =  "Materials/" + name + ".png";
 
 
                     images.Add(img);
                     effects.Add(generateEffect(texture, img));
-                    materials.Add(new material() { id = name, instance_effect = new instance_effect() { url = "#" + name + "-fx" } });
+                    materials.Add(new material() { id = getMatName(texture), instance_effect = new instance_effect() { url = "#" + name + "-fx" } });
                 }
             }
         }
@@ -307,7 +406,7 @@ namespace Anzer
             var phong = new effectFx_profile_abstractProfile_COMMONTechniquePhong();
             profile.technique.Item = phong;
 
-            profile.technique.Items = new object[]{
+            profile.Items = new object[]{
                 new common_newparam_type() {
                    sid = name + "-surface",
                    ItemElementName = ItemChoiceType.surface,
@@ -371,7 +470,12 @@ namespace Anzer
 
         private string getTextureName(ANZTextureData texture)
         {
-            ; return (new FileInfo(texture.File)).Name.Replace(".dds", "") + "Mat";
+            ; return (new FileInfo(texture.File)).Name.Replace(".dds", "");
+        }
+
+        private string getName(ANZFile file)
+        {
+            return getTextureName(file.Textures.First());
         }
 
 
@@ -405,10 +509,21 @@ namespace Anzer
                 controller = controllers.ToArray()
             };
 
+            var animLib = new library_animations()
+            {
+                animation = animations.ToArray()
+            };
+
+            //var animClipLib = new library_animation_clips()
+            //{
+
+            //};
+
             // Make standard scene
             var sceneLib = new library_visual_scenes();
             sceneLib.visual_scene = new visual_scene[] { new visual_scene() };
             sceneLib.visual_scene[0].id = "scene";
+
 
             //nodes.AddRange(makeNodes(-1));
 
@@ -425,17 +540,9 @@ namespace Anzer
             //    };
             //}));
             //sceneLib.visual_scene[0].node = nodes.ToArray();
-            sceneLib.visual_scene[0].node = new node[] {
-                makeNodes(-1)[0],
-                new node()
-                {
-                    type = NodeType.NODE,
-                    id   = geometries[0].name + "-node",
-                    instance_controller = controllerInstances.ToArray(),
-                   // instance_geometry = geometryInstances.ToArray(),
-                    name = geometries[0].name
-                },
-            };
+
+            nodes.AddRange(makeNodes(-1));
+            sceneLib.visual_scene[0].node = nodes.ToArray();
 
 
             // Write textures
@@ -465,6 +572,8 @@ namespace Anzer
                 geometryLib,
                 controllerLib,
                 sceneLib,
+                animLib,
+                //animClipLib
             };
             
             collada.scene = new COLLADAScene();
@@ -483,7 +592,7 @@ namespace Anzer
                 if (bone.Value[0] == boneId)
                 {
                     node node = new Collada141.node();
-                    node.id = bone.Name + "-node";
+                    node.id = bone.Name; //+ "-node";
                     node.sid = bone.Name;
                     node.name = bone.Name;
                     node.type = NodeType.JOINT;
