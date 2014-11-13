@@ -19,6 +19,7 @@ namespace Anzer
         private Dictionary<Keys, Lerper> values;
 
         private int offset = 0;
+
         private bool dirty = false;
 
 
@@ -64,6 +65,13 @@ namespace Anzer
             }
         }
 
+        internal void BeginSection(int offset)
+        {
+            this.offset = offset;
+            if (this.offset > 0 && keyFrames.Count > 0) dirty = true;
+
+        }
+
         public IEnumerable<Frame> Frames
         {
             get
@@ -76,6 +84,23 @@ namespace Anzer
                     float rx = values[Keys.RotX].AtTime(t);
                     float ry = values[Keys.RotY].AtTime(t);
                     float rz = values[Keys.RotZ].AtTime(t);
+
+
+                    //float c1 = (float)Math.Cos(rx / 2);
+                    //float c2 = (float)Math.Cos(ry / 2);
+                    //float c3 = (float)Math.Cos(rz / 2);
+                    //float s1 = (float)Math.Sin(rx / 2);
+                    //float s2 = (float)Math.Sin(ry / 2);
+                    //float s3 = (float)Math.Sin(rz / 2);
+
+                    //var q = new Quaternion(
+                    //     c1*s2*c3 + s1*c2*s3,
+                    //     s1*c2*c3 - c1*s2*s3,
+                    //     c1*c2*s3 - s1*s2*c3,
+                    //     c1*c2*c3 + s1*s2*s3
+                    //);
+                    //var R = Matrix4.Rotate(q);
+
 
                     var Rx = Matrix4.CreateRotationX(rx);
                     var Ry = Matrix4.CreateRotationY(ry);
@@ -112,6 +137,7 @@ namespace Anzer
                 return (int)Math.Floor(keyFrames.Last()) + 1;
             }
         }
+
     }
 
 }

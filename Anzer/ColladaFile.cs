@@ -52,6 +52,8 @@ namespace Anzer
 
         private int counter = 0;
         private int ANIM_COUNTER;
+        private int animOffset = 0;
+
         public float Scale { get; private set; }
 
         public ColladaFile(float scale = 0.01f)
@@ -80,23 +82,26 @@ namespace Anzer
 
             foreach (var anim in motion.Anims)
             {
+                int nextOffset = animOffset;
                 foreach (var boneAnim in anim.Objects)
                 {
-                    extractAnimations(boneAnim);
+                    nextOffset = Math.Max(extractAnimations(boneAnim, animOffset), nextOffset);
                 }
+
+                animOffset = nextOffset;
             }
 
         }
 
-        private void extractAnimations(ANZAnimData.Object anim)
+        private int extractAnimations(ANZAnimData.Object anim, int offset)
         {
             if (!boneAnimMap.ContainsKey(anim.Name))
             {
                 Console.Error.WriteLine("Couldn't find bone {0} for animating.", anim.Name);
-                return;
+                return offset;
             }
             var srt = boneAnimMap[anim.Name];
-            srt.BeginSection();
+            srt.BeginSection(offset);
 
             // Rot x, y, z
             int index = 3;
@@ -132,6 +137,8 @@ namespace Anzer
                 }
                 index++;
             }
+
+            return srt.TotalFrames;
         }
 
         private animation generateAnimation(IEnumerable<Frame> inOut, string type, string bone)
