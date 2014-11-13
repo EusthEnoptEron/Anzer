@@ -31,7 +31,9 @@ namespace Anzer
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Head000_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Mayu001_000.anz"));
 
-            collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_bath_sex_w1.anz"));
+
+            collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_hentai_mitumeru_w1.anz"));
+            //collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_bath_sex_w1.anz"));
             //collada.Save("E:\\tmp\\exporter\\test.dae");
             collada.Save(@"E:\Dev\Unity\Ofuzake\Assets\Models4\\test.dae");
             
