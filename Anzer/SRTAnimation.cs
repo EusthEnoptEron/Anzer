@@ -18,6 +18,10 @@ namespace Anzer
         private List<float> keyFrames = new List<float>();
         private Dictionary<Keys, Lerper> values;
 
+        private int offset = 0;
+        private bool dirty = false;
+
+
         public SRTAnimation()
         {
             values = new Dictionary<Keys, Lerper>();
@@ -31,9 +35,33 @@ namespace Anzer
 
         public void AddKey(float time, Keys key, float value)
         {
+            time += offset;
+            if (dirty)
+            {
+                dirty = false;
+                // repeat last animations
+                foreach(var lerper in values) {
+                    AddKey(time - offset - 1e-2f, lerper.Key,lerper.Value.AtTime(time));
+                }
+            }
+
             values[key].AddValue(time, value);
 
             if (!keyFrames.Contains(time)) keyFrames.Add(time);
+        }
+
+
+        /// <summary>
+        /// Starts a new section.
+        /// </summary>
+        public void BeginSection()
+        {
+            if (keyFrames.Count > 0)
+            {
+                offset = TotalFrames;
+
+                dirty = true;
+            }
         }
 
         public IEnumerable<Frame> Frames
@@ -72,6 +100,17 @@ namespace Anzer
                 }
             }
 
+        }
+
+        public int TotalFrames
+        {
+            get
+            {
+                if (keyFrames.Count == 0) return 0;
+
+                keyFrames.Sort();
+                return (int)Math.Floor(keyFrames.Last()) + 1;
+            }
         }
     }
 

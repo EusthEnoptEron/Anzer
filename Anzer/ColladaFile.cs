@@ -19,6 +19,12 @@ namespace Anzer
         public float t;
         public Matrix4 mat;
     }
+
+    class Bone {
+        public ANZBoneData bone;
+        public string parent;
+    }
+
     class ColladaFile
     {
         private List<geometry> geometries = new List<geometry>();
@@ -30,12 +36,19 @@ namespace Anzer
         private List<node> nodes = new List<node>();
         private List<controller> controllers = new List<controller>();
         private Dictionary<string, ANZTextureData> textures = new Dictionary<string, ANZTextureData>();
+
         private List<ANZBoneData> bones = new List<ANZBoneData>();
         private Dictionary<string, int> boneMap = new Dictionary<string, int>();
+
+
+        private Dictionary<string, Bone> globalBoneMap = new Dictionary<string, Bone>();
+        private Dictionary<string, SRTAnimation> boneAnimMap = new Dictionary<string, SRTAnimation>();
+
         private List<animation> animations = new List<animation>();
         private List<animation_clip> clips = new List<animation_clip>();
 
         private string[] blacklist = { "L_moemoe_bone", "L_moemoe_nub", "R_moemoe_bone", "R_moemoe_nub" };
+        private string rootBone = "";
 
         private int counter = 0;
         private int ANIM_COUNTER;
@@ -47,6 +60,8 @@ namespace Anzer
         }
         public void AddMotion(ANZFile motion)
         {
+            registerBones(motion);
+
             //SRT:
                 // 3 = xrot
                 // 4 = yrot
@@ -63,117 +78,60 @@ namespace Anzer
             };
             var animChildren = new List<animation>();
 
-            int counter = 0;
-
             foreach (var anim in motion.Anims)
             {
-                string aName = name + "_" + ++counter + "_anim";
-
-                var animation = new animation()
+                foreach (var boneAnim in anim.Objects)
                 {
-                     id = aName,
-                     name = name + "_" + counter
-                };
-
-
-                var animationObjects = anim.Objects.Select(GenerateAnimation).Where(v => v != null)
-                                        .SelectMany( a => (animation[])a.Items )
-                                        .ToArray();
-                animChildren = new List<animation>(animationObjects);
-                if (counter > 2) break;
-              //  break;
-                /*
-                animation.Items = animationObjects;
-
-                animChildren.Add(animation);
-
-                animation_clip clip = new animation_clip()
-                {
-                    start = 0,
-                    end = anim.TotalFrames,
-                    id = aName + "-clip",
-                    instance_animation = animationObjects.Select((a) =>
-                    {
-                        return new InstanceWithExtra()
-                        {
-                            url = "#" + a.id
-                        };
-                    }).ToArray()
-                };
-
-                clips.Add(clip);*/
+                    extractAnimations(boneAnim);
+                }
             }
 
-            //rootAnimation.Items = animChildren.ToArray();
-
-
-
-            //animations.Add(rootAnimation);
-            animations.AddRange(animChildren);
         }
 
-
-        private animation GenerateAnimation(ANZAnimData.Object anim)
+        private void extractAnimations(ANZAnimData.Object anim)
         {
-          //  if (anim.No != 1) return null;
-            var animation = new animation()
+            if (!boneAnimMap.ContainsKey(anim.Name))
             {
-                id = anim.Name + "-transform" + (ANIM_COUNTER++)
-            };
+                Console.Error.WriteLine("Couldn't find bone {0} for animating.", anim.Name);
+                return;
+            }
+            var srt = boneAnimMap[anim.Name];
+            srt.BeginSection();
 
-            SRTAnimation srt = new SRTAnimation();
-
-            SortedList<float, float> times = new SortedList<float, float>();
-
-            List<animation> anims = new List<Collada141.animation>();
-
-            // Rot X
+            // Rot x, y, z
             int index = 3;
-            foreach(var component in new SRTAnimation.Keys[]{SRTAnimation.Keys.RotX, SRTAnimation.Keys.RotY, SRTAnimation.Keys.RotZ}) {
+            foreach (var component in new SRTAnimation.Keys[] { SRTAnimation.Keys.RotX, SRTAnimation.Keys.RotY, SRTAnimation.Keys.RotZ })
+            {
                 SortedDictionary<float, Matrix4> inOut = new SortedDictionary<float, Matrix4>();
                 if (anim.SRT[index].Flags == 0x01)
                     foreach (var keyframe in anim.SRT[index].KeyFrames)
                     {
                         srt.AddKey(keyframe.Frame, component, keyframe.Value * (float)Math.PI / (180));
-                        //inOut.Add(keyframe.Frame, makeMatrix(component, keyframe.Value / 10 * (float)Math.PI / 180));
                     }
                 else
                 {
                     srt.AddKey(0, component, anim.SRT[index].Value * (float)Math.PI / (180));
-                    //inOut.Add(0,  makeMatrix(component, anim.SRT[index].Value / 10 * (float)Math.PI / 180));
                 }
-
-               // anims.Add(generateAnimation(inOut, "transform", anim.Name));
 
                 index++;
             }
 
-            // Trans X
-            foreach(var component in new SRTAnimation.Keys[]{SRTAnimation.Keys.TransX, SRTAnimation.Keys.TransY, SRTAnimation.Keys.TransZ})
+            // Trans x, y, z
+            foreach (var component in new SRTAnimation.Keys[] { SRTAnimation.Keys.TransX, SRTAnimation.Keys.TransY, SRTAnimation.Keys.TransZ })
             {
                 SortedDictionary<float, Matrix4> inOut = new SortedDictionary<float, Matrix4>();
                 if (anim.SRT[index].Flags == 0x01)
                     foreach (var keyframe in anim.SRT[index].KeyFrames)
                     {
                         srt.AddKey(keyframe.Frame, component, keyframe.Value * Scale);
-                        //inOut.Add(keyframe.Frame, makeTMatrix(component, keyframe.Value / 10));
                     }
                 else
                 {
                     srt.AddKey(0, component, anim.SRT[index].Value * Scale);
 
-                    //inOut.Add(0, makeTMatrix(component, anim.SRT[index].Value / 10));
                 }
-                //anims.Add(generateAnimation(inOut, "transform", anim.Name));
-
                 index++;
             }
-
-            anims.Add(generateAnimation(srt.Frames, "transform", anim.Name));
-
-            animation.Items = anims.ToArray();
-
-            return animation;
         }
 
         private animation generateAnimation(IEnumerable<Frame> inOut, string type, string bone)
@@ -545,14 +503,26 @@ namespace Anzer
 
         private void registerBones(ANZFile file)
         {
-            // TODO: allow more than one bone tree
-            if (bones.Count > 0) return;
+            bones.Clear();
+            boneMap.Clear();
 
             foreach (var bone in file.Bones)
             {
                 bones.Add(bone);
                 boneMap.Add(bone.Name, bones.Count - 1);
 
+                if (!globalBoneMap.ContainsKey(bone.Name))
+                {
+                    var parent = "";
+                    if (bone.Value[0] >= 0) parent = file.Bones[bone.Value[0]].Name;
+                    else
+                    {
+                        rootBone = bone.Name;
+                    }
+
+                    globalBoneMap.Add(bone.Name, new Bone { bone = bone, parent = parent });
+                    boneAnimMap.Add(bone.Name, new SRTAnimation());
+                }
 
             }
         }
@@ -701,7 +671,11 @@ namespace Anzer
 
             var animLib = new library_animations()
             {
-                animation = animations.ToArray()
+                animation = boneAnimMap
+                .Where(map => map.Value.TotalFrames > 0 )
+                .Select((map) => {
+                  return generateAnimation(map.Value.Frames, "transform", map.Key);
+                }).ToArray()
             };
 
             var animClipLib = new library_animation_clips()
@@ -731,7 +705,7 @@ namespace Anzer
             //}));
             //sceneLib.visual_scene[0].node = nodes.ToArray();
 
-            nodes.AddRange(makeNodes(-1));
+            nodes.AddRange(makeNodes(""));
             sceneLib.visual_scene[0].node = nodes.ToArray();
 
 
@@ -772,19 +746,24 @@ namespace Anzer
             collada.Save(file);
         }
 
-        private node[] makeNodes(int boneId)
+        private node[] makeNodes(string boneId)
         {
 
             List<node> nodes = new List<node>();
+
             int j = 0;
-            foreach (var bone in bones)
+            var enumerator = globalBoneMap.GetEnumerator();
+            while (enumerator.MoveNext())
             {
-                if (bone.Value[0] == boneId)
+                var bone = enumerator.Current.Value;
+                var boneName = enumerator.Current.Key;
+
+                if (bone.parent ==  boneId)
                 {
                     node node = new Collada141.node();
-                    node.id = bone.Name; //+ "-node";
-                    node.sid = bone.Name;
-                    node.name = bone.Name;
+                    node.id = boneName; //+ "-node";
+                    node.sid = boneName;
+                    node.name = boneName;
                     node.type = NodeType.JOINT;
                     node.ItemsElementName = new ItemsChoiceType2[] {
                         ItemsChoiceType2.matrix
@@ -792,12 +771,16 @@ namespace Anzer
                     node.Items = new object[] {
                         new matrix() {
                              sid="transform",
-                             Values = getMatrix(bone.Matrix).AsDoubles()
+                             Values = getMatrix(bone.bone.Matrix).AsDoubles()
                         }
                     };
-                    node.node1 = makeNodes(j);
+                    node.node1 = makeNodes(boneName);
                     nodes.Add(node);
                 }
+            }
+            foreach (var bone in bones)
+            {
+               
                 j++;
             }
 
