@@ -12,6 +12,204 @@ using System.Text;
 
 namespace Anzer
 {
+    class Lerper
+    {
+        SortedList<float, float> values = new SortedList<float, float>();
+        public Lerper()
+        {
+
+        }
+
+        public void AddValue(float t, float val)
+        {
+            values.Add(t, val);
+        }
+
+        /// <summary>
+        /// Returns the value at time [t]
+        /// </summary>
+        /// <param name="t"></param>
+        /// <returns></returns>
+        public float AtTime(float t)
+        {
+            if (values.Count == 0) return 0;
+
+            var enumerator = values.GetEnumerator();
+            Nullable<KeyValuePair<float, float>> prevCandidate = null;
+            Nullable<KeyValuePair<float, float>> nextCandidate = null;
+            
+            while (enumerator.MoveNext())
+            {
+                if (enumerator.Current.Key < t)
+                {
+                    prevCandidate = new KeyValuePair<float,float>(enumerator.Current.Key, enumerator.Current.Value);
+                }
+                else if (enumerator.Current.Key >= t)
+                {
+                    nextCandidate = new KeyValuePair<float, float>(enumerator.Current.Key, enumerator.Current.Value);
+                    break;
+                }
+            }
+
+            if (prevCandidate == null) return nextCandidate.Value.Value;
+            if (nextCandidate == null) return prevCandidate.Value.Value;
+
+            // lerp!
+            float t0 = prevCandidate.Value.Key;
+            float t1 = nextCandidate.Value.Key - t0;
+            t = (t-t0) / t1;
+
+            float v0 = prevCandidate.Value.Value;
+            float v1 = nextCandidate.Value.Value;
+
+            return (1 - t) * v0 + t * v1;
+        }
+    }
+
+
+    class SRTAnimation {
+        public enum Keys {
+            RotX, RotY, RotZ,
+            TransX, TransY, TransZ
+        }
+
+        private Matrix4 baseMatrix;
+        private List<float> keyFrames = new List<float>();
+        private Dictionary<Keys, Lerper> values;
+
+        public SRTAnimation(Matrix4 baseMatrix)
+        {
+            this.baseMatrix = baseMatrix;
+
+            values = new Dictionary<Keys, Lerper>();
+            values.Add(Keys.RotX, new Lerper());
+            values.Add(Keys.RotY, new Lerper());
+            values.Add(Keys.RotZ, new Lerper());
+            values.Add(Keys.TransX, new Lerper());
+            values.Add(Keys.TransY, new Lerper());
+            values.Add(Keys.TransZ, new Lerper());
+        }
+
+        public void AddKey(float time, Keys key, float value)
+        {
+            values[key].AddValue(time, value);
+
+            if (!keyFrames.Contains(time)) keyFrames.Add(time);
+        }
+
+        public IEnumerable<Frame> Frames
+        {
+            get
+            {
+                // Sort key frames
+                keyFrames.Sort();
+
+                foreach (float t in keyFrames)
+                {
+                    float rx = values[Keys.RotX].AtTime(t);
+                    float ry = values[Keys.RotY].AtTime(t);
+                    float rz = values[Keys.RotZ].AtTime(t);
+
+                    // Add base values
+                    rx += (float)Math.Atan2(baseMatrix.M32, baseMatrix.M33);
+                    ry += (float)Math.Atan2(-baseMatrix.M31, Math.Sqrt(baseMatrix.M32 * baseMatrix.M32 + baseMatrix.M33 * baseMatrix.M33));
+                    rz += (float)Math.Atan2(baseMatrix.M21, baseMatrix.M11);
+
+                    // Assuming the angles are in radians.
+                    float ch = (float)Math.Cos(ry);
+                    float sh = (float)Math.Sin(ry);
+                    float cp = (float)Math.Cos(rx);
+                    float sp = (float)Math.Sin(rx);
+                    float cb = (float)Math.Cos(rz);
+                    float sb = (float)Math.Sin(rz);
+
+                    float c2 = (float)Math.Cos(ry);
+                    float s2 = (float)Math.Sin(ry);
+                    float c1 = (float)Math.Cos(rx);
+                    float s1 = (float)Math.Sin(rx);
+                    float c3 = (float)Math.Cos(rz);
+                    float s3 = (float)Math.Sin(rz);
+                    
+                    Matrix4 R = new Matrix4(
+                        (ch * cb + sh * sp * sb), (sb * cp), (-sh * cb + ch * sp * sb), 0,
+                        (-ch * sb + sh * sp * cb), (cb * cp), (sb * sh + ch * sp * cb), 0,
+                        (sh * cp), (-sp), (ch * cp), 0,
+                        0, 0, 0, 1
+                    );  
+                    
+                    R.Transpose();
+
+                    var Rx = Matrix4.CreateRotationX(rx);
+                    var Ry = Matrix4.CreateRotationY(ry);
+                    var Rz = Matrix4.CreateRotationZ(rz);
+                    //var bRx = Matrix4.CreateRotationX(bx);
+                    //var bRy = Matrix4.CreateRotationY(by);
+                    //var bRz = Matrix4.CreateRotationZ(bz);
+
+                    R = Matrix4.Mult(Matrix4.Mult(Rx, Ry), Rz);
+                 //   var R0 = Matrix4.Mult(Matrix4.Mult(bRx, bRy), bRz);
+
+                    R.Transpose();
+                    //R1.Transpose();
+
+                    //R = Matrix4.Mult(R1, R0);
+
+
+                    //R = Rz;
+                    //Matrix4 R = new Matrix4(
+                    //    c2 * c3,    -s2, c2 * s3, 0,
+                    //    s1 * s3 + c1 * c3 * s2, c1 * c2, c1 * s2 * s3 - c3 * s1, 0,
+                    //    c3 * s1 * s2 - c1 * s3, c2 * s1, c1 * c3 + s1 * s2 * s3, 0,
+                    //    0, 0, 0, 1
+                    //);
+
+
+                    Matrix4 T1 = Matrix4.CreateTranslation(
+                       values[Keys.TransX].AtTime(t) + baseMatrix.M14,
+                       values[Keys.TransY].AtTime(t) + baseMatrix.M24,
+                       values[Keys.TransZ].AtTime(t) + baseMatrix.M34
+                    );
+
+                    Matrix4 T0 = Matrix4.CreateTranslation(
+                        baseMatrix.M14,
+                        baseMatrix.M24,
+                        baseMatrix.M34
+                    );
+
+                    T0.Transpose();
+                    T1.Transpose();
+
+                    //var scale = new Vector3d(
+                    //    baseMatrix.Column0.Length,
+                    //    baseMatrix.Column1.Length,
+                    //    baseMatrix.Column2.Length
+                    //);
+
+                    //T = Matrix4.Identity;
+                   
+
+                    //R.Invert();
+                    //T.Invert();
+                    //Matrix4 T = new Matrix4(
+                    //    1, 0, 0, values[Keys.TransX].AtTime(t),
+                    //    0, 1, 0, values[Keys.TransY].AtTime(t),
+                    //    0, 0, 1, values[Keys.TransZ].AtTime(t),
+                    //    0, 0, 0, 1);
+                    yield return new Frame() {
+                        t = t / 30,
+                        mat = Matrix4.Mult(Matrix4.Mult(T1, R), Matrix4.Identity)
+                    };
+                }
+            }
+        
+        }
+    }
+
+    struct Frame
+    {
+        public float t;
+        public Matrix4 mat;
+    }
     class ColladaFile
     {
         private List<geometry> geometries = new List<geometry>();
@@ -26,10 +224,12 @@ namespace Anzer
         private List<ANZBoneData> bones = new List<ANZBoneData>();
         private Dictionary<string, int> boneMap = new Dictionary<string, int>();
         private List<animation> animations = new List<animation>();
+        private List<animation_clip> clips = new List<animation_clip>();
 
         private string[] blacklist = { "L_moemoe_bone", "L_moemoe_nub", "R_moemoe_bone", "R_moemoe_nub" };
 
         private int counter = 0;
+        private int ANIM_COUNTER;
         public float Scale { get; private set; }
 
         public ColladaFile(float scale = 0.01f)
@@ -55,6 +255,7 @@ namespace Anzer
             var animChildren = new List<animation>();
 
             int counter = 0;
+
             foreach (var anim in motion.Anims)
             {
                 string aName = name + "_" + ++counter + "_anim";
@@ -65,37 +266,224 @@ namespace Anzer
                      name = name + "_" + counter
                 };
 
-                animation.Items = anim.Objects.Select(GenerateAnimation).Where(v => v != null).ToArray();
+
+                var animationObjects = anim.Objects.Select(GenerateAnimation).Where(v => v != null)
+                                        .SelectMany( a => (animation[])a.Items )
+                                        .ToArray();
+                animChildren = new List<animation>(animationObjects);
+                if (counter > 2) break;
+              //  break;
+                /*
+                animation.Items = animationObjects;
 
                 animChildren.Add(animation);
+
+                animation_clip clip = new animation_clip()
+                {
+                    start = 0,
+                    end = anim.TotalFrames,
+                    id = aName + "-clip",
+                    instance_animation = animationObjects.Select((a) =>
+                    {
+                        return new InstanceWithExtra()
+                        {
+                            url = "#" + a.id
+                        };
+                    }).ToArray()
+                };
+
+                clips.Add(clip);*/
             }
 
-            rootAnimation.Items = animChildren.ToArray();
+            //rootAnimation.Items = animChildren.ToArray();
 
-            animations.Add(rootAnimation);
+
+
+            //animations.Add(rootAnimation);
+            animations.AddRange(animChildren);
         }
 
-        private ANZAnimData GenerateAnimation(ANZAnimData.Object anim)
+
+        private animation GenerateAnimation(ANZAnimData.Object anim)
         {
-            if (anim.No != 1) return null;
+          //  if (anim.No != 1) return null;
             var animation = new animation()
             {
-                id = anim.Name + "-transform"
+                id = anim.Name + "-transform" + (ANIM_COUNTER++)
             };
 
-            //Matrix4 mat = Matrix4.Identity;
-            //SortedList<float, float> times = new SortedList<float, float>();
 
-            //if(anim.SRT[3].Flags == 0x01)
-            //    foreach(var keyframe in anim.SRT[3].KeyFrames) {
-                    
-            //    }
-            //else {
+            Matrix4 mat = Matrix4.Identity;
+            var parent = bones[boneMap[anim.Name]].Value[0];
+            var baseM = parent >= 0 ? getMatrix(bones[parent].Matrix) : Matrix4.Identity;
+            
+            //SRTAnimation srt = new SRTAnimation(baseM);
+            //SRTAnimation srt = new SRTAnimation(getMatrix(bones[boneMap[anim.Name]].Matrix));
+            SRTAnimation srt = new SRTAnimation(Matrix4.Identity);
 
-            //}
+            SortedList<float, float> times = new SortedList<float, float>();
 
+            List<animation> anims = new List<Collada141.animation>();
 
-            return null;
+            // Rot X
+            int index = 3;
+            foreach(var component in new SRTAnimation.Keys[]{SRTAnimation.Keys.RotX, SRTAnimation.Keys.RotY, SRTAnimation.Keys.RotZ}) {
+                SortedDictionary<float, Matrix4> inOut = new SortedDictionary<float, Matrix4>();
+                if (anim.SRT[index].Flags == 0x01)
+                    foreach (var keyframe in anim.SRT[index].KeyFrames)
+                    {
+                        srt.AddKey(keyframe.Frame, component, keyframe.Value * (float)Math.PI / (180));
+                        //inOut.Add(keyframe.Frame, makeMatrix(component, keyframe.Value / 10 * (float)Math.PI / 180));
+                    }
+                else
+                {
+                    srt.AddKey(0, component, anim.SRT[index].Value * (float)Math.PI / (180));
+                    //inOut.Add(0,  makeMatrix(component, anim.SRT[index].Value / 10 * (float)Math.PI / 180));
+                }
+
+               // anims.Add(generateAnimation(inOut, "transform", anim.Name));
+
+                index++;
+            }
+
+            // Trans X
+            foreach(var component in new SRTAnimation.Keys[]{SRTAnimation.Keys.TransX, SRTAnimation.Keys.TransY, SRTAnimation.Keys.TransZ})
+            {
+                SortedDictionary<float, Matrix4> inOut = new SortedDictionary<float, Matrix4>();
+                if (anim.SRT[index].Flags == 0x01)
+                    foreach (var keyframe in anim.SRT[index].KeyFrames)
+                    {
+                        srt.AddKey(keyframe.Frame, component, keyframe.Value * Scale);
+                        //inOut.Add(keyframe.Frame, makeTMatrix(component, keyframe.Value / 10));
+                    }
+                else
+                {
+                    srt.AddKey(0, component, anim.SRT[index].Value * Scale);
+
+                    //inOut.Add(0, makeTMatrix(component, anim.SRT[index].Value / 10));
+                }
+                //anims.Add(generateAnimation(inOut, "transform", anim.Name));
+
+                index++;
+            }
+
+            anims.Add(generateAnimation(srt.Frames, "transform", anim.Name));
+
+            animation.Items = anims.ToArray();
+
+            return animation;
+        }
+
+        private animation generateAnimation(IEnumerable<Frame> inOut, string type, string bone)
+        {
+
+            // Create input
+            string aid = bone + (ANIM_COUNTER++) + "-" + type;
+            var input = new source()
+            {
+                id = aid + "-input",
+                Item = new float_array()
+                {
+                    count = (ulong)inOut.Count(),
+                    id = aid + "-input-array",
+                    Values = inOut.Select(v => (double)v.t).ToArray()
+                },
+                technique_common = new sourceTechnique_common()
+                {
+                    accessor = new accessor()
+                    {
+                        count = (ulong)inOut.Count(),
+                        source = "#" + aid + "-input-array",
+                        stride = 1,
+                        param = new param[]{ new param()
+                        {
+                             name = "TIME",
+                             type = "float"
+                        }}
+                    }
+                }
+            };
+
+            var output = new source()
+            {
+                id = aid + "-output",
+                Item = new float_array()
+                {
+                    count = (ulong)inOut.Count()*16,
+                    id = aid + "-output-array",
+                    Values = inOut.SelectMany(v => v.mat.AsDoubles()).ToArray()
+                },
+                technique_common = new sourceTechnique_common()
+                {
+                    accessor = new accessor()
+                    {
+                        count = (ulong)inOut.Count(),
+                        source = "#" + aid + "-output-array",
+                        stride = 16,
+                        param = new param[]{ new param()
+                        {
+                             name = type,
+                             type = "float4x4"
+                        }}
+                    }
+                }
+            };
+
+            var interpolation = new source()
+            {
+                id = aid + "-interpol",
+                Item = new Name_array()
+                {
+                    count = (ulong)inOut.Count(),
+                    id = aid + "-interpol-array",
+                    Values = inOut.Select(v => "LINEAR").ToArray()
+                },
+                technique_common = new sourceTechnique_common()
+                {
+                    accessor = new accessor()
+                    {
+                        count = (ulong)inOut.Count(),
+                        source = "#" + aid + "-interpol-array",
+                        stride = 1,
+                        param = new param[]{ new param()
+                        {
+                             name = "INTERPOLATION",
+                             type = "Name"
+                        }}
+                    }
+                }
+            };
+
+            var sampler = new sampler()
+            {
+                id = aid + "-sampler",
+                input = new InputLocal[]{
+                    new InputLocal() {
+                         semantic = "INPUT",
+                         source   = "#" + input.id
+                    },
+                    new InputLocal() {
+                         semantic = "OUTPUT",
+                         source   = "#" + output.id
+                    },
+                    new InputLocal() {
+                         semantic = "INTERPOLATION",
+                         source   = "#" + interpolation.id
+                    }
+                }
+            };
+
+            var channel = new channel()
+            {
+                source = "#" + sampler.id,
+                target = bone + "/" + type
+            };
+
+            return new animation()
+            {
+                 id = aid + "-anim",
+                 Items = new object[]{ input, output, interpolation, sampler, channel }
+            };
         }
 
         public void AddAnz(ANZFile file)
@@ -514,10 +902,10 @@ namespace Anzer
                 animation = animations.ToArray()
             };
 
-            //var animClipLib = new library_animation_clips()
-            //{
-
-            //};
+            var animClipLib = new library_animation_clips()
+            {
+                 animation_clip = clips.ToArray()
+            };
 
             // Make standard scene
             var sceneLib = new library_visual_scenes();
