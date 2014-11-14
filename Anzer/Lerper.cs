@@ -5,9 +5,9 @@ using System.Text;
 
 namespace Anzer
 {
-
     class Slerper : Lerper
     {
+        private const float PERIOD = 360;
         public Slerper()
         {
             predicate = slerp;
@@ -18,15 +18,15 @@ namespace Anzer
             v0 = normalize(v0);
             v1 = normalize(v1);
 
-            if (Math.Abs(v1 - v0) <= Math.PI)
+            if (Math.Abs(v1 - v0) <= PERIOD / 2)
             {
                 // Let's go with this.
                 return lerp(v0, v1, t);
             }
             else
             {
-                if (v0 < v1) v0 += (float)Math.PI * 2;
-                else v1 += (float)Math.PI * 2;
+                if (v0 < v1) v0 += PERIOD;
+                else v1 += PERIOD;
 
                 // Other way is shorter
                 return normalize(lerp(v0, v1, t));
@@ -41,8 +41,8 @@ namespace Anzer
         /// <returns></returns>
         private float normalize(float angle)
         {
-            if (angle < Math.PI) angle += 2 * (float)Math.PI;
-            if (angle > Math.PI) angle -= 2 * (float)Math.PI;
+            if (angle < PERIOD / 2) angle += PERIOD;
+            if (angle > PERIOD / 2) angle -= PERIOD;
 
             return angle;
         }
@@ -51,7 +51,7 @@ namespace Anzer
         {
             get
             {
-                return values.Select(v => new Frame { t = v.Key, val = v.Value * 180 / (float)Math.PI });
+                return values.Select(v => new Frame { t = v.Key, val = v.Value });
             }
         }
 

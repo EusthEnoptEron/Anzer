@@ -86,26 +86,9 @@ namespace Anzer
 
                 foreach (float t in keyFrames)
                 {
-                    float rx = values[Keys.RotX].AtTime(t);
-                    float ry = values[Keys.RotY].AtTime(t);
-                    float rz = values[Keys.RotZ].AtTime(t);
-
-
-                    //float c1 = (float)Math.Cos(rx / 2);
-                    //float c2 = (float)Math.Cos(ry / 2);
-                    //float c3 = (float)Math.Cos(rz / 2);
-                    //float s1 = (float)Math.Sin(rx / 2);
-                    //float s2 = (float)Math.Sin(ry / 2);
-                    //float s3 = (float)Math.Sin(rz / 2);
-
-                    //var q = new Quaternion(
-                    //     c1*s2*c3 + s1*c2*s3,
-                    //     s1*c2*c3 - c1*s2*s3,
-                    //     c1*c2*s3 - s1*s2*c3,
-                    //     c1*c2*c3 + s1*s2*s3
-                    //);
-                    //var R = Matrix4.Rotate(q);
-
+                    float rx = values[Keys.RotX].AtTime(t) * (float)Math.PI / 180;
+                    float ry = values[Keys.RotY].AtTime(t) * (float)Math.PI / 180;
+                    float rz = values[Keys.RotZ].AtTime(t) * (float)Math.PI / 180;
 
                     var Rx = Matrix4.CreateRotationX(rx);
                     var Ry = Matrix4.CreateRotationY(ry);

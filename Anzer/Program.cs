@@ -23,7 +23,7 @@ namespace Anzer
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Bust000_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Arm000_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\BHair001_000.anz"));
-            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\DLingerie001_000.anz"));
+            //collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\DLingerie001_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\EarAcs001_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Eye000_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Face000_000.anz"));
@@ -31,8 +31,9 @@ namespace Anzer
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Head000_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Mayu001_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\HeadAcs013_000.anz"));
-            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Sperma_Mouth_00.anz"));
-            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\ALLCosB002_000.anz"));
+            //collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Sperma_Mouth_00.anz"));
+            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\ALLCos_sukumizu.anz"));
+            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\ALLCosB_sukumizu.anz"));
 
 
             //collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_hentai_mitumeru_w1.anz"));

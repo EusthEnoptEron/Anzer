@@ -114,11 +114,11 @@ namespace Anzer
                 if (anim.SRT[index].Flags == 0x01)
                     foreach (var keyframe in anim.SRT[index].KeyFrames)
                     {
-                        srt.AddKey(keyframe.Frame / FPS, component, keyframe.Value * (float)Math.PI / (180));
+                        srt.AddKey(keyframe.Frame / FPS, component, keyframe.Value);
                     }
                 else
                 {
-                    srt.AddKey(0, component, anim.SRT[index].Value * (float)Math.PI / (180));
+                    srt.AddKey(0, component, anim.SRT[index].Value);
                 }
 
                 index++;
@@ -151,6 +151,8 @@ namespace Anzer
             string targetName = "transform";
             IEnumerable<double> values = inOut.Select(v => (double)v.val);
             uint stride = 1;
+
+            // Bezier is not really implemented
             bool linear = true;
             List<InputLocal> samplerElements = new List<InputLocal>();
             List<object> animationElements = new List<object>();
@@ -183,6 +185,7 @@ namespace Anzer
                     targetName = "rotateZ.ANGLE";
                     break;
                 default:
+                    // Not really used anymore...
                     paramType = "float4x4";
                     stride = 16;
                     values = inOut.SelectMany(v => v.mat.AsDoubles());
@@ -963,14 +966,6 @@ namespace Anzer
                     sid = "rotateX",
                     Values = new double[]{ 1, 0, 0, rx }
                 },
-            };
-
-            return new object[] {
-
-                new matrix() {
-                        sid="transform",
-                        Values = getMatrix(bone.bone.Matrix).AsDoubles()
-                }
             };
         }
 
