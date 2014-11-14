@@ -51,8 +51,9 @@
     <SignManifests>false</SignManifests>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="KissLib">
-      <HintPath>D:\Novels\KISS\カスタムメイド3D\tools\KissLib.dll</HintPath>
+    <Reference Include="KissLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\KissLib.dll</HintPath>
     </Reference>
     <Reference Include="Magick.NET-x86">
       <HintPath>..\packages\Magick.NET-Q8-x86.7.0.0.0005\lib\net20\Magick.NET-x86.dll</HintPath>
