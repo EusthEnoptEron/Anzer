@@ -10,3 +10,5 @@ Anzer.exe [OPTIONS] file1.anz file2.anz ...
 -f [dae|obj]     sets output format
 -h               shows help
 ```
+
+![Unity Import](https://cdn.rawgit.com/EusthEnoptEron/Anzer/master/Anzer/Resources/cm3dunity.jpg)
