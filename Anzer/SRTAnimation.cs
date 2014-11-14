@@ -117,10 +117,12 @@ namespace Anzer
                     R.Transpose();
                     T.Transpose();
 
+                    var M = Matrix4.Mult(T, R);
+
                     yield return new Frame()
                     {
                         t = t / 30,
-                        mat = Matrix4.Mult(T, R)
+                        mat = M
                     };
                 }
             }

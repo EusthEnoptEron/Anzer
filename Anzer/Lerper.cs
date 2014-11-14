@@ -29,7 +29,7 @@ namespace Anzer
                 else v1 += (float)Math.PI * 2;
 
                 // Other way is shorter
-                return lerp(v0, v1, t);
+                return normalize(lerp(v0, v1, t));
             }
 
         }
@@ -46,6 +46,7 @@ namespace Anzer
 
             return angle;
         }
+
     }
 
 
@@ -54,7 +55,7 @@ namespace Anzer
         public delegate float Interpolater(float v0, float v1, float t);
 
         protected Interpolater predicate;
-        SortedList<float, float> values = new SortedList<float, float>();
+        protected SortedList<float, float> values = new SortedList<float, float>();
         public Lerper()
         {
             predicate = lerp;
@@ -70,7 +71,7 @@ namespace Anzer
             return (1 - t) * v0 + t * v1;
         }
 
-        public void AddValue(float t, float val)
+        public virtual void AddValue(float t, float val)
         {
             values.Add(t, val);
         }

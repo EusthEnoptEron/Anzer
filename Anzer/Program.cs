@@ -30,10 +30,15 @@ namespace Anzer
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\FHair018_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Head000_000.anz"));
             collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Mayu001_000.anz"));
+            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\HeadAcs013_000.anz"));
+            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\Sperma_Mouth_00.anz"));
+            collada.AddAnz(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Model\ALLCosB002_000.anz"));
 
 
             //collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_hentai_mitumeru_w1.anz"));
             //collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_bath_sex_w1.anz"));
+
+            collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_heroin_pose.anz"));
             collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_higyaku_irama_w1.anz"));
             collada.AddMotion(ANZFile.FromFile(@"D:\Novels\KISS\カスタムメイド3D\GameData\Motion\mot_houshi_paizurifera_w1.anz"));
             //collada.Save("E:\\tmp\\exporter\\test.dae");
