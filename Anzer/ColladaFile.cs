@@ -26,7 +26,7 @@ namespace Anzer
         public string parent;
     }
 
-    class ColladaFile
+    class ColladaFile : IConvertTarget, IMotionSupport
     {
         private List<geometry> geometries = new List<geometry>();
         private List<instance_geometry> geometryInstances = new List<instance_geometry>();
@@ -767,7 +767,7 @@ namespace Anzer
 
         private string getTextureName(ANZTextureData texture)
         {
-            ; return (new FileInfo(texture.File)).Name.Replace(".dds", "");
+            return (new FileInfo(texture.File)).Name.Replace(".dds", "");
         }
 
         private string getName(ANZFile file)
@@ -998,6 +998,12 @@ namespace Anzer
             }
 
             return m;
+        }
+
+
+        public void AddMesh(ANZFile path)
+        {
+            AddAnz(path);
         }
 
     }

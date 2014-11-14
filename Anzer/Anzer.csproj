@@ -57,9 +57,6 @@
     <Reference Include="Magick.NET-x86">
       <HintPath>..\packages\Magick.NET-Q8-x86.7.0.0.0005\lib\net20\Magick.NET-x86.dll</HintPath>
     </Reference>
-    <Reference Include="ManagedFbx">
-      <HintPath>..\..\..\libs\ManagedFbx.dll</HintPath>
-    </Reference>
     <Reference Include="OpenTK, Version=1.1.0.0, Culture=neutral, PublicKeyToken=bad199fe84eb3df4, processorArchitecture=MSIL">
       <HintPath>..\packages\Lyncee.OpenTK.1.1.1173.43181\lib\OpenTK.dll</HintPath>
     </Reference>
@@ -73,7 +70,9 @@
       <Link>collada_schema_1_4.cs</Link>
     </Compile>
     <Compile Include="ColladaFile.cs" />
+    <Compile Include="ConvertTarget.cs" />
     <Compile Include="Lerper.cs" />
+    <Compile Include="ObjFile.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SRTAnimation.cs" />
