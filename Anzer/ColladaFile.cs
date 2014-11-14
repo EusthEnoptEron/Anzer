@@ -18,6 +18,7 @@ namespace Anzer
     {
         public float t;
         public Matrix4 mat;
+        public float val;
     }
 
     class Bone {
@@ -55,10 +56,12 @@ namespace Anzer
         private int animOffset = 0;
 
         public float Scale { get; private set; }
+        public float FPS { get; private set; }
 
-        public ColladaFile(float scale = 0.01f)
+        public ColladaFile(float scale = 0.01f, float fps = 30f )
         {
             Scale = scale;
+            FPS = fps;
         }
         public void AddMotion(ANZFile motion)
         {
@@ -111,7 +114,7 @@ namespace Anzer
                 if (anim.SRT[index].Flags == 0x01)
                     foreach (var keyframe in anim.SRT[index].KeyFrames)
                     {
-                        srt.AddKey(keyframe.Frame, component, keyframe.Value * (float)Math.PI / (180));
+                        srt.AddKey(keyframe.Frame / FPS, component, keyframe.Value * (float)Math.PI / (180));
                     }
                 else
                 {
@@ -128,7 +131,7 @@ namespace Anzer
                 if (anim.SRT[index].Flags == 0x01)
                     foreach (var keyframe in anim.SRT[index].KeyFrames)
                     {
-                        srt.AddKey(keyframe.Frame, component, keyframe.Value * Scale);
+                        srt.AddKey(keyframe.Frame / FPS, component, keyframe.Value * Scale);
                     }
                 else
                 {
@@ -141,11 +144,54 @@ namespace Anzer
             return srt.TotalFrames;
         }
 
-        private animation generateAnimation(IEnumerable<Frame> inOut, string type, string bone)
+        private animation generateAnimation(IEnumerable<Frame> inOut, SRTAnimation.Keys type, string bone)
         {
+            string paramName = "transform";
+            string paramType = "float";
+            string targetName = "transform";
+            IEnumerable<double> values = inOut.Select(v => (double)v.val);
+            uint stride = 1;
+            bool linear = true;
+            List<InputLocal> samplerElements = new List<InputLocal>();
+            List<object> animationElements = new List<object>();
+
+
+            switch (type)
+            {
+                case SRTAnimation.Keys.TransX:
+                    paramName = "X";
+                    targetName = "translate.X";
+                    break;
+                case SRTAnimation.Keys.TransY:
+                    paramName = "Y";
+                    targetName = "translate.Y";
+                    break;
+                case SRTAnimation.Keys.TransZ:
+                    paramName = "Z";
+                    targetName = "translate.Z";
+                    break;
+                case SRTAnimation.Keys.RotX:
+                    paramName = "ANGLE";
+                    targetName = "rotateX.ANGLE";
+                    break;
+                case SRTAnimation.Keys.RotY:
+                    paramName = "ANGLE";
+                    targetName = "rotateY.ANGLE";
+                    break;
+                case SRTAnimation.Keys.RotZ:
+                    paramName = "ANGLE";
+                    targetName = "rotateZ.ANGLE";
+                    break;
+                default:
+                    paramType = "float4x4";
+                    stride = 16;
+                    values = inOut.SelectMany(v => v.mat.AsDoubles());
+                    linear = true;
+                    break;
+            }
 
             // Create input
-            string aid = bone + (ANIM_COUNTER++) + "-" + type;
+            string aid = bone + (ANIM_COUNTER++) + "-" + type.ToString();
             var input = new source()
             {
                 id = aid + "-input",
@@ -171,14 +217,16 @@ namespace Anzer
                 }
             };
 
+            animationElements.Add(input);
+
             var output = new source()
             {
                 id = aid + "-output",
                 Item = new float_array()
                 {
-                    count = (ulong)inOut.Count()*16,
+                    count = (ulong)inOut.Count() * stride,
                     id = aid + "-output-array",
-                    Values = inOut.SelectMany(v => v.mat.AsDoubles()).ToArray()
+                    Values = values.ToArray()
                 },
                 technique_common = new sourceTechnique_common()
                 {
@@ -186,15 +234,17 @@ namespace Anzer
                     {
                         count = (ulong)inOut.Count(),
                         source = "#" + aid + "-output-array",
-                        stride = 16,
+                        stride = stride,
                         param = new param[]{ new param()
                         {
-                             name = type,
-                             type = "float4x4"
+                             name = paramName,
+                             type = paramType
                         }}
                     }
                 }
             };
+
+            animationElements.Add(output);
 
             var interpolation = new source()
             {
@@ -203,7 +253,7 @@ namespace Anzer
                 {
                     count = (ulong)inOut.Count(),
                     id = aid + "-interpol-array",
-                    Values = inOut.Select(v => "LINEAR").ToArray()
+                    Values = inOut.Select(v => linear ? "LINEAR" : "BEZIER").ToArray()
                 },
                 technique_common = new sourceTechnique_common()
                 {
@@ -221,35 +271,112 @@ namespace Anzer
                 }
             };
 
+            animationElements.Add(interpolation);
+
+
+            samplerElements.AddRange(new InputLocal[]{
+                new InputLocal() {
+                        semantic = "INPUT",
+                        source   = "#" + input.id
+                },
+                new InputLocal() {
+                        semantic = "OUTPUT",
+                        source   = "#" + output.id
+                },
+                new InputLocal() {
+                        semantic = "INTERPOLATION",
+                        source   = "#" + interpolation.id
+                }
+            });
+
+            if (!linear)
+            {
+                // We gotta make the tangents...
+                var intan = new source()
+                {
+                    id = aid + "-intan",
+                    Item = new float_array()
+                    {
+                        count = (ulong)inOut.Count(),
+                        id = aid + "-intan-array",
+                        Values = inOut.Select(v => 0d).ToArray()
+                    },
+                    technique_common = new sourceTechnique_common()
+                    {
+                        accessor = new accessor()
+                        {
+                            count = (ulong)inOut.Count(),
+                            source = "#" + aid + "-intan-array",
+                            stride = 1,
+                            param = new param[]{ new param()
+                        {
+                             name = paramName,
+                             type = "float"
+                        }}
+                        }
+                    }
+                };
+
+                var outan = new source()
+                {
+                    id = aid + "-outan",
+                    Item = new float_array()
+                    {
+                        count = (ulong)inOut.Count(),
+                        id = aid + "-outan-array",
+                        Values = inOut.Select(v => 0d).ToArray()
+                    },
+                    technique_common = new sourceTechnique_common()
+                    {
+                        accessor = new accessor()
+                        {
+                            count = (ulong)inOut.Count(),
+                            source = "#" + aid + "-outan-array",
+                            stride = 1,
+                            param = new param[]{ new param()
+                        {
+                             name = paramName,
+                             type = "float"
+                        }}
+                        }
+                    }
+                };
+
+                animationElements.Add(intan);
+                animationElements.Add(outan);
+                samplerElements.AddRange(new InputLocal[]{
+                    new InputLocal() {
+                         semantic = "IN_TANGENT",
+                         source   = "#" + intan.id
+                    },
+                    new InputLocal() {
+                         semantic = "OUT_TANGENT",
+                         source   = "#" + outan.id
+                    },
+                });
+
+            }
+
+
             var sampler = new sampler()
             {
                 id = aid + "-sampler",
-                input = new InputLocal[]{
-                    new InputLocal() {
-                         semantic = "INPUT",
-                         source   = "#" + input.id
-                    },
-                    new InputLocal() {
-                         semantic = "OUTPUT",
-                         source   = "#" + output.id
-                    },
-                    new InputLocal() {
-                         semantic = "INTERPOLATION",
-                         source   = "#" + interpolation.id
-                    }
-                }
+                input = samplerElements.ToArray()
             };
 
             var channel = new channel()
             {
                 source = "#" + sampler.id,
-                target = bone + "/" + type
+                target = bone + "/" + targetName
             };
+
+            animationElements.Add(sampler);
+            animationElements.Add(channel);
 
             return new animation()
             {
                  id = aid + "-anim",
-                 Items = new object[]{ input, output, interpolation, sampler, channel }
+                 Items = animationElements.ToArray()
             };
         }
 
@@ -680,8 +807,15 @@ namespace Anzer
             {
                 animation = boneAnimMap
                 .Where(map => map.Value.TotalFrames > 0 )
-                .Select((map) => {
-                  return generateAnimation(map.Value.Frames, "transform", map.Key);
+                .SelectMany((map) => {
+                  return new animation[]{
+                      generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransX), SRTAnimation.Keys.TransX, map.Key),
+                      generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransY), SRTAnimation.Keys.TransY, map.Key),
+                      generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransZ), SRTAnimation.Keys.TransZ, map.Key),
+                      generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotX), SRTAnimation.Keys.RotX, map.Key),
+                      generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotY), SRTAnimation.Keys.RotY, map.Key),
+                      generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotZ), SRTAnimation.Keys.RotZ, map.Key),
+                  };
                 }).ToArray()
             };
 
@@ -773,14 +907,12 @@ namespace Anzer
                     node.name = boneName;
                     node.type = NodeType.JOINT;
                     node.ItemsElementName = new ItemsChoiceType2[] {
-                        ItemsChoiceType2.matrix
+                        ItemsChoiceType2.translate,
+                        ItemsChoiceType2.rotate,
+                        ItemsChoiceType2.rotate,
+                        ItemsChoiceType2.rotate,
                     };
-                    node.Items = new object[] {
-                        new matrix() {
-                             sid="transform",
-                             Values = getMatrix(bone.bone.Matrix).AsDoubles()
-                        }
-                    };
+                    node.Items = makeBoneTransform(bone);
                     node.node1 = makeNodes(boneName);
                     nodes.Add(node);
                 }
@@ -792,6 +924,54 @@ namespace Anzer
             }
 
             return nodes.ToArray();
+        }
+
+        private object[] makeBoneTransform(Bone bone)
+        {
+            var M = getMatrix(bone.bone.Matrix);
+
+            float rx = (float)Math.Atan2(M.M32, M.M33);
+            float ry = (float)Math.Atan2(-M.M31, Math.Sqrt(M.M32 * M.M32 + M.M33 * M.M33));
+            float rz = (float)Math.Atan2(M.M21, M.M11);
+
+            rx *= 180 / (float)Math.PI;
+            ry *= 180 / (float)Math.PI;
+            rz *= 180 / (float)Math.PI;
+
+            float tx = M.M14;
+            float ty = M.M24;
+            float tz = M.M34;
+
+            float sx = 1;
+            float sy = 1;
+            float sz = 1;
+
+            return new object[] {
+                new TargetableFloat3() {
+                    sid = "translate",
+                    Values = new double[]{ tx, ty, tz }
+                },
+                new rotate() {
+                    sid = "rotateZ",
+                    Values = new double[]{ 0, 0, 1, rz }
+                },
+                new rotate() {
+                    sid = "rotateY",
+                    Values = new double[]{ 0, 1, 0, ry }
+                },
+                new rotate() {
+                    sid = "rotateX",
+                    Values = new double[]{ 1, 0, 0, rx }
+                },
+            };
+
+            return new object[] {
+
+                new matrix() {
+                        sid="transform",
+                        Values = getMatrix(bone.bone.Matrix).AsDoubles()
+                }
+            };
         }
 
         private Matrix4 getWorldMatrix(int boneId)

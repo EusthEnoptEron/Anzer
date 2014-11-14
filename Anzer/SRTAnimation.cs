@@ -72,6 +72,11 @@ namespace Anzer
 
         }
 
+        public IEnumerable<Frame> GetFrames(Keys type)
+        {
+            return values[type].Frames;
+        }
+
         public IEnumerable<Frame> Frames
         {
             get
@@ -121,7 +126,7 @@ namespace Anzer
 
                     yield return new Frame()
                     {
-                        t = t / 30,
+                        t = t,
                         mat = M
                     };
                 }

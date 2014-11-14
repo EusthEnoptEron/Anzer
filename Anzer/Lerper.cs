@@ -47,6 +47,15 @@ namespace Anzer
             return angle;
         }
 
+        public override IEnumerable<Frame> Frames
+        {
+            get
+            {
+                return values.Select(v => new Frame { t = v.Key, val = v.Value * 180 / (float)Math.PI });
+            }
+        }
+
+
     }
 
 
@@ -118,6 +127,14 @@ namespace Anzer
             float v1 = nextCandidate.Value.Value;
 
             return predicate(v0, v1, t);
+        }
+
+        public virtual IEnumerable<Frame> Frames
+        {
+            get
+            {
+                return values.Select(v => new Frame { t = v.Key, val = v.Value });
+            }
         }
     }
 

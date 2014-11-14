@@ -52,47 +52,6 @@ namespace Anzer
         }
 
 
-        private static effectFx_profile_abstractProfile_COMMON generateEffect(ANZTextureData texture, image img)
-        {
-            string name = getTextureName(texture);
-            var profile = new effectFx_profile_abstractProfile_COMMON();
-            profile.technique = new effectFx_profile_abstractProfile_COMMONTechnique() { sid = "common" } ;
-
-            var phong = new effectFx_profile_abstractProfile_COMMONTechniquePhong();
-            profile.technique.Item = phong;
-
-            profile.technique.Items = new object[]{
-                new common_newparam_type() {
-                   sid = name + "-surface",
-                   ItemElementName = ItemChoiceType.surface,
-                   Item = new fx_surface_common() {
-                      type = fx_surface_type_enum.Item2D,
-                      init_from = new fx_surface_init_from_common[]{ new fx_surface_init_from_common() { Value = img.id } }
-                   }
-                },
-                new common_newparam_type() {
-                    sid = name + "-sampler",
-                    ItemElementName = ItemChoiceType.sampler2D,
-                    Item = new fx_sampler2D_common() {
-                       source = name + "-surface"
-                    }
-                }
-            };
-
-            phong.emission = new common_color_or_texture_type() { Item = new common_color_or_texture_typeColor() { sid = "emission", Values = new double[]{ 0, 0, 0, 1 } } };
-            phong.ambient = new common_color_or_texture_type() { Item = new common_color_or_texture_typeColor() { sid = "ambient", Values = new double[] { 0, 0, 0, 1 } } };
-            phong.specular = new common_color_or_texture_type() { Item = new common_color_or_texture_typeColor() { sid = "specular", Values = new double[] { 0.5, 0.5, 0.5, 1 } } };
-            phong.shininess = new common_float_or_param_type() { Item = new common_float_or_param_typeFloat() { Value = 50f} };
-            phong.diffuse = new common_color_or_texture_type() { Item = new common_color_or_texture_typeTexture() { texture = name + "-sampler" } };
-            phong.transparency = new common_float_or_param_type() { Item = new common_float_or_param_typeFloat() { Value = 1 } };
-            phong.transparent = new common_transparent_type() {  opaque = fx_opaque_enum.A_ONE, Item = new common_color_or_texture_typeColor() { Values = new double[]{0, 0, 0, 1} } };
-            
-            //profile.technique.Items = new object[]{img};
-           
-
-            return profile;
-        }
-
         static string getTextureName(ANZTextureData text)
         {
             return (new FileInfo(text.File)).Name.Replace(".dds", "")+"Mat";
