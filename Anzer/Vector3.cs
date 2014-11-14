@@ -2,12 +2,29 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Models.ANZ;
 
 namespace Anzer
 {
     internal class Vector3
     {
         public float[] values = new float[3];
+
+        public Vector3() { }
+
+        /// <summary>
+        /// Uses reflection so that we don't need a dependency on the entire SlimDX framework.
+        /// </summary>
+        /// <param name="morphVector"></param>
+        public Vector3(ANZMorphData.MorphVertex morphVector)
+        {
+            var type = morphVector.GetType();
+            var slimVector = type.GetField("Offset").GetValue(morphVector);
+
+            x = (float)slimVector.GetType().GetField("X").GetValue(slimVector);
+            y = (float)slimVector.GetType().GetField("Y").GetValue(slimVector);
+            z = (float)slimVector.GetType().GetField("Z").GetValue(slimVector);
+        }
 
         public float x
         {

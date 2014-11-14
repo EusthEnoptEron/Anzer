@@ -53,6 +53,7 @@ namespace Anzer
 
         private int counter = 0;
         private int ANIM_COUNTER;
+        private int MORPH_COUNTER;
         private int animOffset = 0;
 
         public float Scale { get; private set; }
@@ -103,9 +104,10 @@ namespace Anzer
         {
             registerTextures(file);
             registerBones(file);
-
-
+            
             List<instance_controller> controllerInstances = new List<instance_controller>();
+
+            int offset = 0;
 
             foreach (var mesh in file.Meshes)
             {
@@ -126,7 +128,7 @@ namespace Anzer
                 var positions = generateSource(mesh.Vertices.Select(v => new Vector3() { x = v.x * Scale, y = v.y * Scale, z = v.z * Scale }),
                     new String[] { "X", "Y", "Z" }, geometry.id + "_positions");
 
-
+                
                 // Export vertex normals
                 var normals = generateSource(mesh.Vertices.Select(v => new Vector3() { x = v.nx, y = v.ny, z = v.nz }.Inverted),
                     new String[] { "X", "Y", "Z" }, geometry.id + "_normals");
@@ -180,22 +182,6 @@ namespace Anzer
                     polylist
                 };
                 geometries.Add(geometry);
-
-                //nodes.Add(new node() { 
-                //    instance_geometry = new instance_geometry[]{ new instance_geometry() { url = "#" + geometry.id }},
-                //    type = NodeType.NODE
-                //});
-                geometryInstances.Add(new instance_geometry()
-                {
-                    url = "#" + geometry.id,
-                    bind_material = new bind_material()
-                    {
-                        technique_common = new instance_material[]{
-                            new instance_material() { symbol = polylist.material, target = "#" + polylist.material  }
-                        }
-                    }
-                });
-
 
                 // Do bones
                 var controller = new controller();
@@ -320,8 +306,88 @@ namespace Anzer
                 skin.vertex_weights.vcount = vcount;
                 skin.vertex_weights.v = vArr;
 
-
                 controllers.Add(controller);
+
+
+                geometry[] morphTargets = generateMorphTargets(mesh, file, offset);
+                if (morphTargets.Length > 0)
+                {
+                    geometries.AddRange(morphTargets);
+
+                    // Add morph controller
+                    string mCID = geometry.id + "-morph";
+
+                    skin.source1 = "#" + mCID;
+
+                    var mController = new controller()
+                    {
+                        id = mCID,
+                        name = mCID,
+                        Item = new morph()
+                        {
+                            method = MorphMethodType.NORMALIZED,
+                            source1 = "#" + geometry.id,
+                            source = new source[]{
+                                new source() {
+                                     id = mCID + "_targets",
+                                     Item = new IDREF_array() {
+                                         count = (uint)morphTargets.Length,
+                                         id = mCID + "_targets_array",
+                                         Value = string.Join(" ", morphTargets.Select(t => t.id).ToArray())
+                                     },
+                                     technique_common = new sourceTechnique_common() {
+                                          accessor = new accessor() {
+                                               count =  (uint)morphTargets.Length,
+                                               source = "#" + mCID + "_targets_array",
+                                               param = new param[]{new param() {
+                                                    name = "MORPH_TARGET",
+                                                    type = "IDREF"
+                                               }}
+                                          }
+                                     }
+                                },
+
+                                new source() {
+                                     id = mCID + "_weights",
+                                     Item = new float_array() {
+                                         count = (uint)morphTargets.Length,
+                                         id = mCID + "_weights_array",
+                                         Values = morphTargets.Select(t => (double)1).ToArray()
+                                     },
+                                     technique_common = new sourceTechnique_common() {
+                                          accessor = new accessor() {
+                                               count =  (uint)morphTargets.Length,
+                                               source = "#" + mCID + "_weights_array",
+                                               param = new param[]{new param() {
+                                                    name = "MORPH_WEIGHT",
+                                                    type = "float"
+                                               }}
+                                          }
+                                     }
+                                }
+
+                            },
+                            targets = new morphTargets()
+                            {
+                                input = new InputLocal[]{
+                                    new InputLocal() {
+                                         semantic = "MORPH_TARGET",
+                                         source  = "#" + mCID + "_targets"
+                                    },
+                                    new InputLocal()  {
+                                        semantic = "MORPH_WEIGHT",
+                                        source   = "#" + mCID + "_weights"
+                                    }
+                                }
+                            }
+
+                        }
+                    };
+
+                    controllers.Add(mController);
+                }
+
+
 
                 controllerInstances.Add(new instance_controller()
                 {
@@ -339,6 +405,7 @@ namespace Anzer
                     }
                 });
 
+                offset += mesh.NativeVertex.Length;
             }
 
             nodes.Add(new node()
@@ -350,6 +417,67 @@ namespace Anzer
                 // instance_geometry = geometryInstances.ToArray(),
                 name = getName(file)
             });
+        }
+
+        private geometry[] generateMorphTargets(ANZMeshData mesh, ANZFile file, int offset)
+        {
+            var geometries = new List<geometry>();
+            int min = offset;
+            int max = offset + mesh.NativeVertex.Length - 1;
+
+
+            foreach(var target in file.Morphs) {
+                var filteredOffsets = target.Elems.Where(e => e.Index >= min && e.Index <= max)
+                        .ToLookup(e => mesh.Indices[(e.Index - offset)] );
+
+                if (filteredOffsets.Count() > 10)
+                {
+                    string id = "morph-mesh-"+ (MORPH_COUNTER++);
+
+                    var vectors = mesh.Vertices.Select((v, index) =>
+                    {
+                        var vector = new Vector3() { x = v.x, y = v.y, z = v.z };
+                        if (filteredOffsets.Contains(index))
+                        {
+                            var offsetVector = new Vector3(filteredOffsets[index].First());
+                            vector.x += offsetVector.x;
+                            vector.y += offsetVector.y;
+                            vector.z += offsetVector.z;
+                        }
+
+                        vector.x *= Scale;
+                        vector.y *= Scale;
+                        vector.z *= Scale;
+                        return vector;
+                    });
+
+                    var geometry = new geometry()
+                    {
+                        id = id,
+                        name = id,
+                        Item = new mesh()
+                        {
+                            source = new source[]{
+                                generateSource(vectors, new string[]{ "X", "Y","Z" }, id + "_positions")
+                            },
+                            vertices = new vertices()
+                            {
+                                id = id + "_vertices",
+                                input = new InputLocal[]{
+                                    new InputLocal() {
+                                         semantic = "POSITION",
+                                         source   =  "#" + id + "_positions"
+                                    }
+                                }
+                            }
+                        }
+                    };
+
+                    geometries.Add(geometry);
+                }
+            }
+
+            return geometries.ToArray();
         }
 
         public void Save(string file)

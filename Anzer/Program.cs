@@ -12,8 +12,6 @@ namespace Anzer
 {
     class Program
     {
-        private const float SCALE = 0.01f;
-
         static void Main(string[] args)
         {
             if (args.Length == 0 || args[0] == "-h")
