@@ -144,7 +144,7 @@ namespace Anzer
 
                 
                 // Export vertex normals
-                var normals = generateSource(mesh.Vertices.Select(v => new Vector3() { x = v.nx, y = v.ny, z = v.nz }.Inverted),
+                var normals = generateSource(mesh.Vertices.Select(v => new Vector3() { x = v.nx, y = v.ny, z = v.nz }),
                     new String[] { "X", "Y", "Z" }, geometry.id + "_normals");
 
                 // Export vertex uvs
