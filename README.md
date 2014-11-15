@@ -8,6 +8,11 @@ Anzer.exe [OPTIONS] file1.anz file2.anz ...
 
 -o file.dae      sets destination
 -f [dae|obj]     sets output format
+-m               exports morphs
+-s               exports skins
+-a               exports animations
+-c               merges sub meshes
+-u				 optimize output for Unity
 -h               shows help
 ```
 

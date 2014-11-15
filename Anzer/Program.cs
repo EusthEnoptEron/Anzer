@@ -179,6 +179,7 @@ namespace Anzer
             Console.WriteLine("-s               exports skins");
             Console.WriteLine("-a               exports animations");
             Console.WriteLine("-c               merges sub meshes");
+            Console.WriteLine("-u               optimize output for Unity");
             Console.WriteLine("-h               shows help");
         }
 
