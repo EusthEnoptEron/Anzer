@@ -28,6 +28,8 @@ namespace Anzer
 
     class ColladaFile : IConvertTarget, IMotionSupport
     {
+        private Dictionary<string, string> fileNames = new Dictionary<string, string>();
+
         private List<geometry> geometries = new List<geometry>();
         private List<instance_geometry> geometryInstances = new List<instance_geometry>();
         private List<instance_controller> controllerInstances = new List<instance_controller>();
@@ -58,6 +60,12 @@ namespace Anzer
 
         public float Scale { get; private set; }
         public float FPS { get; private set; }
+        public Settings Options = Settings.All;
+
+        private bool Has(Settings setting)
+        {
+            return (Options & setting) == setting;
+        }
 
         public ColladaFile(float scale = 0.01f, float fps = 30f )
         {
@@ -69,6 +77,8 @@ namespace Anzer
 
         public void AddMotion(ANZFile motion)
         {
+            if (!Has(Settings.Animations)) return;
+
             registerBones(motion);
 
             //SRT:
@@ -109,7 +119,11 @@ namespace Anzer
 
             int offset = 0;
 
-            foreach (var mesh in file.Meshes)
+            var meshes = file.Meshes;
+            if(Has(Settings.Merge))
+                meshes = new ANZMeshData[]{file.Meshes.Aggregate((m1, m2) => m1.Concat(m2))};
+
+            foreach (var mesh in meshes)
             {
 
                 var texture = getTexture(file, mesh);
@@ -183,151 +197,178 @@ namespace Anzer
                 };
                 geometries.Add(geometry);
 
+                skin skin = null;
                 // Do bones
-                var controller = new controller();
-                controller.id = "Armature-" + geometry.id;
-                controller.name = controller.id;
-
-                var skin = new skin();
-                controller.Item = skin;
-
-                skin.source1 = "#" + geometry.id;
-                skin.bind_shape_matrix = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
-
-                //var bones = file.Bones.Where((bone, i) => mesh.Bones.Contains(i));
-                var bones = new List<ANZBoneData>();
-                foreach (int b in mesh.Bones)
+                if (Has(Settings.Skin))
                 {
-                    bones.Add(this.bones[b]);
-                }
+                    var controller = new controller();
+                    controller.id = "Armature-" + geometry.id;
+                    controller.name = controller.id;
 
-                // JOINTS
-                var joints = new source();
-                joints.id = controller.id + "_joints";
-                var nameArray = (joints.Item = new Name_array()) as Name_array;
-                nameArray.id = joints.id + "_array";
-                nameArray.count = (ulong)bones.Count();
-                nameArray.Values = bones.Select(b => b.Name).ToArray();
-                joints.technique_common = new sourceTechnique_common();
-                joints.technique_common.accessor = new accessor();
-                joints.technique_common.accessor.count = (ulong)bones.Count();
-                joints.technique_common.accessor.source = "#" + nameArray.id;
-                joints.technique_common.accessor.stride = 1;
-                joints.technique_common.accessor.param = new param[] { new param() { name = "JOINT", type = "name" } };
+                    skin = new skin();
+                    controller.Item = skin;
 
-                // BIND POSES
-                var binds = new source();
-                binds.id = controller.id + "_poses";
-                var floatArray = (binds.Item = new float_array()) as float_array;
-                floatArray.id = binds.id + "_array";
-                floatArray.count = (ulong)bones.Count() * 16;
-                floatArray.Values = bones.Select((b, i) => getWorldMatrix(mesh.Bones[i]).AsDoubles()).SelectMany(y => y).ToArray();
-                binds.technique_common = new sourceTechnique_common();
-                binds.technique_common.accessor = new accessor();
-                binds.technique_common.accessor.count = (ulong)bones.Count();
-                binds.technique_common.accessor.source = "#" + floatArray.id;
-                binds.technique_common.accessor.stride = 16;
-                binds.technique_common.accessor.param = new param[] { new param() { name = "TRANSFORM", type = "float4x4" } };
+                    skin.source1 = "#" + geometry.id;
+                    skin.bind_shape_matrix = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
 
-                // WEIGHTS
-                var weights = new source();
-                weights.id = controller.id + "_weights";
-                var weightArray = (weights.Item = new float_array()) as float_array;
-                weightArray.id = weights.id + "_array";
-                weightArray.count = (ulong)mesh.Vertices.Count * 4;
-                weightArray.Values = mesh.Vertices.Select(v =>
-                {
-                    var bns = new int[] { v.b1, v.b2, v.b3, v.b4 };
-                    var wts = new int[] { v.w1, v.w2, v.w3, v.w4 };
-                    float sum = 0;
-                    for (int idx = 0; idx < bns.Length; idx++)
-                        if (localBlacklist.Contains(bns[idx]))
-                            wts[idx] = 0;
-                        else
-                            sum += wts[idx];
-
-                    return new double[] { wts[0] / sum, wts[1] / sum, wts[2] / sum, wts[3] / sum };
-                }).SelectMany(y => y).ToArray();
-
-                weights.technique_common = new sourceTechnique_common();
-                weights.technique_common.accessor = new accessor();
-                weights.technique_common.accessor.count = (ulong)mesh.Vertices.Count * 4;
-                weights.technique_common.accessor.source = "#" + weightArray.id;
-                weights.technique_common.accessor.stride = 1;
-                weights.technique_common.accessor.param = new param[] { new param() { name = "WEIGHT", type = "float" } };
-
-                skin.source = new source[] { joints, binds, weights };
-
-                skin.joints = new skinJoints();
-                skin.joints.input = new InputLocal[]{
-                    new InputLocal()
+                    //var bones = file.Bones.Where((bone, i) => mesh.Bones.Contains(i));
+                    var bones = new List<ANZBoneData>();
+                    foreach (int b in mesh.Bones)
                     {
-                         semantic = "JOINT",
-                         source  = "#" + joints.id
-                    },
-                    new InputLocal() {
-                        semantic = "INV_BIND_MATRIX",
-                        source  = "#" + binds.id
-                    }
-                };
-
-                skin.vertex_weights = new skinVertex_weights();
-                skin.vertex_weights.input = new InputLocalOffset[] { 
-                    new InputLocalOffset() {
-                        semantic = "JOINT",
-                        source   = "#" + joints.id
-                    },
-                    new InputLocalOffset() {
-                        semantic = "WEIGHT",
-                        offset = 1,
-                        source = "#" + weights.id
-                    }
-                };
-
-                string vcount = "";
-                string vArr = "";
-                int c = 0;
-                foreach (var v in mesh.Vertices)
-                {
-                    var vBones = new int[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0).ToArray();
-                    vcount += vBones.Length + " ";
-
-                    for (int i = 0; i < vBones.Length; i++)
-                    {
-                        //int index = mesh.Bones[vBones.ElementAt(i)];
-
-                        vArr += vBones[i] + " " + (c * 4 + i) + " ";
+                        bones.Add(this.bones[b]);
                     }
 
-                    c++;
-                }
+                    // JOINTS
+                    var joints = new source();
+                    joints.id = controller.id + "_joints";
+                    var nameArray = (joints.Item = new Name_array()) as Name_array;
+                    nameArray.id = joints.id + "_array";
+                    nameArray.count = (ulong)bones.Count();
+                    nameArray.Values = bones.Select(b => b.Name).ToArray();
+                    joints.technique_common = new sourceTechnique_common();
+                    joints.technique_common.accessor = new accessor();
+                    joints.technique_common.accessor.count = (ulong)bones.Count();
+                    joints.technique_common.accessor.source = "#" + nameArray.id;
+                    joints.technique_common.accessor.stride = 1;
+                    joints.technique_common.accessor.param = new param[] { new param() { name = "JOINT", type = "name" } };
 
-                skin.vertex_weights.count = (ulong)mesh.Vertices.Count;
-                skin.vertex_weights.vcount = vcount;
-                skin.vertex_weights.v = vArr;
+                    // BIND POSES
+                    var binds = new source();
+                    binds.id = controller.id + "_poses";
+                    var floatArray = (binds.Item = new float_array()) as float_array;
+                    floatArray.id = binds.id + "_array";
+                    floatArray.count = (ulong)bones.Count() * 16;
+                    floatArray.Values = bones.Select((b, i) => getWorldMatrix(mesh.Bones[i]).AsDoubles()).SelectMany(y => y).ToArray();
+                    binds.technique_common = new sourceTechnique_common();
+                    binds.technique_common.accessor = new accessor();
+                    binds.technique_common.accessor.count = (ulong)bones.Count();
+                    binds.technique_common.accessor.source = "#" + floatArray.id;
+                    binds.technique_common.accessor.stride = 16;
+                    binds.technique_common.accessor.param = new param[] { new param() { name = "TRANSFORM", type = "float4x4" } };
 
-                controllers.Add(controller);
-
-
-                geometry[] morphTargets = generateMorphTargets(mesh, file, offset);
-                if (morphTargets.Length > 0)
-                {
-                    geometries.AddRange(morphTargets);
-
-                    // Add morph controller
-                    string mCID = geometry.id + "-morph";
-
-                    skin.source1 = "#" + mCID;
-
-                    var mController = new controller()
+                    // WEIGHTS
+                    var weights = new source();
+                    weights.id = controller.id + "_weights";
+                    var weightArray = (weights.Item = new float_array()) as float_array;
+                    weightArray.id = weights.id + "_array";
+                    weightArray.count = (ulong)mesh.Vertices.Count * 4;
+                    weightArray.Values = mesh.Vertices.Select(v =>
                     {
-                        id = mCID,
-                        name = mCID,
-                        Item = new morph()
+                        var bns = new int[] { v.b1, v.b2, v.b3, v.b4 };
+                        var wts = new int[] { v.w1, v.w2, v.w3, v.w4 };
+                        float sum = 0;
+                        for (int idx = 0; idx < bns.Length; idx++)
+                            if (localBlacklist.Contains(bns[idx]))
+                                wts[idx] = 0;
+                            else
+                                sum += wts[idx];
+
+                        return new double[] { wts[0] / sum, wts[1] / sum, wts[2] / sum, wts[3] / sum };
+                    }).SelectMany(y => y).ToArray();
+
+                    weights.technique_common = new sourceTechnique_common();
+                    weights.technique_common.accessor = new accessor();
+                    weights.technique_common.accessor.count = (ulong)mesh.Vertices.Count * 4;
+                    weights.technique_common.accessor.source = "#" + weightArray.id;
+                    weights.technique_common.accessor.stride = 1;
+                    weights.technique_common.accessor.param = new param[] { new param() { name = "WEIGHT", type = "float" } };
+
+                    skin.source = new source[] { joints, binds, weights };
+
+                    skin.joints = new skinJoints();
+                    skin.joints.input = new InputLocal[]{
+                        new InputLocal()
                         {
-                            method = MorphMethodType.NORMALIZED,
-                            source1 = "#" + geometry.id,
-                            source = new source[]{
+                             semantic = "JOINT",
+                             source  = "#" + joints.id
+                        },
+                        new InputLocal() {
+                            semantic = "INV_BIND_MATRIX",
+                            source  = "#" + binds.id
+                        }
+                    };
+
+                        skin.vertex_weights = new skinVertex_weights();
+                        skin.vertex_weights.input = new InputLocalOffset[] { 
+                        new InputLocalOffset() {
+                            semantic = "JOINT",
+                            source   = "#" + joints.id
+                        },
+                        new InputLocalOffset() {
+                            semantic = "WEIGHT",
+                            offset = 1,
+                            source = "#" + weights.id
+                        }
+                    };
+
+                    string vcount = "";
+                    string vArr = "";
+                    int c = 0;
+                    foreach (var v in mesh.Vertices)
+                    {
+                        var vBones = new int[] { v.b1, v.b2, v.b3, v.b4 }.Where(b => b >= 0).ToArray();
+                        vcount += vBones.Length + " ";
+
+                        for (int i = 0; i < vBones.Length; i++)
+                        {
+                            //int index = mesh.Bones[vBones.ElementAt(i)];
+
+                            vArr += vBones[i] + " " + (c * 4 + i) + " ";
+                        }
+
+                        c++;
+                    }
+
+                    skin.vertex_weights.count = (ulong)mesh.Vertices.Count;
+                    skin.vertex_weights.vcount = vcount;
+                    skin.vertex_weights.v = vArr;
+
+                    controllers.Add(controller);
+
+
+                    controllerInstances.Add(new instance_controller()
+                    {
+                        url = "#" + controller.id,
+                        skeleton = new string[] { "#" + this.bones.ElementAt(0).Name }, //+ "-node" },
+                        bind_material = new bind_material()
+                        {
+                            technique_common = new instance_material[]{
+                            new instance_material() { symbol = polylist.material, target = "#" + polylist.material, bind_vertex_input = new instance_materialBind_vertex_input[]{
+                                new instance_materialBind_vertex_input() {
+                                    input_semantic="TEXCOORD", semantic="UVs"
+                                }
+                            }  }
+                        }
+                        }
+                    });
+
+                }
+
+
+                if (Has(Settings.Morphs))
+                {
+                    geometry[] morphTargets = generateMorphTargets(mesh, file, offset);
+                    //geometry[] morphTargets = new geometry[0];
+                    if (morphTargets.Length > 0)
+                    {
+                        geometries.AddRange(morphTargets);
+
+                        // Add morph controller
+                        string mCID = geometry.id + "-morph";
+
+                        if (!Has(Settings.Compatibility) && skin != null)
+                        {
+                            skin.source1 = "#" + mCID;
+                        }
+
+                        var mController = new controller()
+                        {
+                            id = mCID,
+                            Item = new morph()
+                            {
+                                method = MorphMethodType.NORMALIZED,
+                                source1 = "#" + geometry.id,
+                                source = new source[]{
                                 new source() {
                                      id = mCID + "_targets",
                                      Item = new IDREF_array() {
@@ -352,7 +393,7 @@ namespace Anzer
                                      Item = new float_array() {
                                          count = (uint)morphTargets.Length,
                                          id = mCID + "_weights_array",
-                                         Values = morphTargets.Select(t => (double)1).ToArray()
+                                         Values = morphTargets.Select(t => (double)0).ToArray()
                                      },
                                      technique_common = new sourceTechnique_common() {
                                           accessor = new accessor() {
@@ -367,43 +408,44 @@ namespace Anzer
                                 }
 
                             },
-                            targets = new morphTargets()
-                            {
-                                input = new InputLocal[]{
+                                targets = new morphTargets()
+                                {
+                                    input = new InputLocal[]{
                                     new InputLocal() {
-                                         semantic = "MORPH_TARGET",
-                                         source  = "#" + mCID + "_targets"
+                                        semantic = "MORPH_TARGET",
+                                        source  = "#" + mCID + "_targets"
                                     },
                                     new InputLocal()  {
                                         semantic = "MORPH_WEIGHT",
                                         source   = "#" + mCID + "_weights"
                                     }
                                 }
-                            }
-
-                        }
-                    };
-
-                    controllers.Add(mController);
-                }
-
-
-
-                controllerInstances.Add(new instance_controller()
-                {
-                    url = "#" + controller.id,
-                    skeleton = new string[] { "#" + this.bones.ElementAt(0).Name }, //+ "-node" },
-                    bind_material = new bind_material()
-                    {
-                        technique_common = new instance_material[]{
-                            new instance_material() { symbol = polylist.material, target = "#" + polylist.material, bind_vertex_input = new instance_materialBind_vertex_input[]{
-                                new instance_materialBind_vertex_input() {
-                                    input_semantic="TEXCOORD", semantic="UVs"
                                 }
-                            }  }
+                            }
+                        };
+
+                        controllers.Add(mController);
+
+                        if (Has(Settings.Compatibility))
+                        {
+                            controllerInstances.Add(new instance_controller()
+                            {
+                                url = "#" + mController.id,
+                                bind_material = new bind_material()
+                                {
+                                    technique_common = new instance_material[]{
+                                    new instance_material() { symbol = polylist.material, target = "#" + polylist.material, bind_vertex_input = new instance_materialBind_vertex_input[]{
+                                        new instance_materialBind_vertex_input() {
+                                            input_semantic="TEXCOORD", semantic="UVs"
+                                        }
+                                    }  }
+                                }
+                                }
+                            });
                         }
                     }
-                });
+                }
+
 
                 offset += mesh.NativeVertex.Length;
             }
@@ -421,11 +463,12 @@ namespace Anzer
 
         private geometry[] generateMorphTargets(ANZMeshData mesh, ANZFile file, int offset)
         {
+            if (file.Morphs == null) return new geometry[] { };
+
             var geometries = new List<geometry>();
             int min = offset;
             int max = offset + mesh.NativeVertex.Length - 1;
-
-
+            
             foreach(var target in file.Morphs) {
                 var filteredOffsets = target.Elems.Where(e => e.Index >= min && e.Index <= max)
                         .ToLookup(e => mesh.Indices[(e.Index - offset)] );
@@ -1027,7 +1070,20 @@ namespace Anzer
 
         private string getName(ANZFile file)
         {
-            return getTextureName(file.Textures.First());
+            if (!fileNames.ContainsKey(file.FileName))
+            {
+                string baseName = getTextureName(file.Textures.First());
+                string name = baseName;
+
+                int i = 1;
+                while (fileNames.ContainsValue(name))
+                {
+                    name = baseName + "_" + (i++);
+                }
+
+                fileNames.Add(file.FileName, name);
+            }
+            return fileNames[file.FileName];
         }
 
 #endregion

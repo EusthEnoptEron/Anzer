@@ -23,15 +23,19 @@ namespace Anzer
             FileInfo dest = null;
             string format = "";
 
+            var settings = Settings.None;
+           
+
             for (int i = 0; i < args.Length; i++)
             {
                 string arg = args[i];
-                if (arg.StartsWith("-"))
+                if (arg.StartsWith("-") || arg.Length == 1)
                 {
+                    var option = arg.Last();
                     // Handle as argument
-                    switch (arg.Substring(1))
+                    switch (option)
                     {
-                        case "o":
+                        case 'o':
                             if (i + 1 >= args.Length)
                             {
                                 Console.Error.WriteLine("No value for {0}", arg);
@@ -50,10 +54,25 @@ namespace Anzer
                             dest = new FileInfo(path);
                             
                             break;
-                        case "h":
+                        case 'h':
                             printHelp();
                             return;
-                        case "f":
+                        case 'u':
+                            settings |= Settings.Compatibility;
+                            break;
+                        case 's':
+                            settings |= Settings.Skin;
+                            break;
+                        case 'm':
+                            settings |= Settings.Morphs;
+                            break;
+                        case 'a':
+                            settings |= Settings.Animations | Settings.Skin;
+                            break;
+                        case 'c':
+                            settings |= Settings.Merge;
+                            break;
+                        case 'f':
                             if (i + 1 >= args.Length)
                             {
                                 Console.Error.WriteLine("No value for {0}", arg);
@@ -102,6 +121,9 @@ namespace Anzer
                     }
                 }
             }
+            if (settings == Settings.None) settings = Settings.All;
+
+
             if (format == "") format = "dae";
 
             var collada = new ColladaFile();
@@ -153,8 +175,63 @@ namespace Anzer
             Console.WriteLine();
             Console.WriteLine("-o file.dae      sets destination");
             Console.WriteLine("-f [dae|obj]     sets output format");
+            Console.WriteLine("-m               exports morphs");
+            Console.WriteLine("-s               exports skins");
+            Console.WriteLine("-a               exports animations");
+            Console.WriteLine("-c               merges sub meshes");
             Console.WriteLine("-h               shows help");
         }
 
+
+    }
+
+    public static class ANZExtensions
+    {
+        public static ANZMeshData Concat(this ANZMeshData self, ANZMeshData other) {
+            var newMesh = new ANZMeshData();
+
+            newMesh.BoneCount = self.BoneCount + other.BoneCount;
+
+            var bones = new List<int>(self.Bones);
+            
+            // OldIndex -> NewIndex
+            var boneMap = new Dictionary<int, int>();
+            for (int i = 0; i < other.Bones.Length; i++)
+            {
+                if (bones.Contains(other.Bones[i])) boneMap.Add(i, bones.IndexOf(other.Bones[i]));
+                else
+                {
+                    bones.Add(other.Bones[i]);
+                    boneMap.Add(i, bones.Count - 1);
+                }
+            }
+
+            newMesh.Bones = bones.ToArray();
+            newMesh.BoneCount = newMesh.Bones.Length;
+            
+
+            //newMesh.FaceCount = self.FaceCount + other.FaceCount;
+            newMesh.Flags = self.Flags.Clone() as byte[];
+            newMesh.FullToUnique = self.FullToUnique.Clone() as int[];
+            
+            newMesh.Indices.AddRange(self.Indices);
+            newMesh.Indices.AddRange(other.Indices.Select(i => i + self.Vertices.Count));
+            newMesh.Material = self.Material;
+            
+            newMesh.Vertices.AddRange(self.Vertices);
+            newMesh.Vertices.AddRange(other.Vertices.Select(vertex => {
+                var v = vertex.Clone() as FullVertex;
+                if (v.b1 >= 0) v.b1 = boneMap[v.b1];
+                if (v.b2 >= 0) v.b2 = boneMap[v.b2];
+                if (v.b3 >= 0) v.b3 = boneMap[v.b3];
+                if (v.b4 >= 0) v.b4 = boneMap[v.b4];
+
+                return v;
+            }));
+
+            newMesh.NativeVertex = newMesh.Indices.Select( i => newMesh.Vertices[i] ).ToArray();
+            //newMesh.VertexMap = newMesh.Vertices.ToDictionary((v, i) => i, Int32.Equals );
+            return newMesh;
+        }
     }
 }
