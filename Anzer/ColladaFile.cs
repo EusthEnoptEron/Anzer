@@ -48,6 +48,8 @@ namespace Anzer
         private Dictionary<string, SRTAnimation> boneAnimMap = new Dictionary<string, SRTAnimation>();
 
         private List<animation> animations = new List<animation>();
+        private Dictionary<string, Dictionary<string, SRTAnimation>> animationFiles = new Dictionary<string, Dictionary<string, SRTAnimation>>();
+
         private List<animation_clip> clips = new List<animation_clip>();
 
         private string[] blacklist = { "L_moemoe_bone", "L_moemoe_nub", "R_moemoe_bone", "R_moemoe_nub" };
@@ -97,17 +99,91 @@ namespace Anzer
             };
             var animChildren = new List<animation>();
 
+            int i = 0;
             foreach (var anim in motion.Anims)
             {
                 int nextOffset = animOffset;
+                Dictionary<string, SRTAnimation> animations = new Dictionary<string, SRTAnimation>();
                 foreach (var boneAnim in anim.Objects)
                 {
-                    nextOffset = Math.Max(extractAnimations(boneAnim, animOffset), nextOffset);
+                    SRTAnimation animation = new SRTAnimation();
+
+                    if (!boneAnimMap.ContainsKey(boneAnim.Name))
+                    {
+                        Console.Error.WriteLine("Couldn't find bone {0} for animating.", boneAnim.Name);
+                        continue;
+                    }
+                    if(!Has(Settings.SliceAnimations)) {
+                        animation = boneAnimMap[boneAnim.Name];
+                    }
+
+                    nextOffset = Math.Max(extractAnimations(boneAnim, animation, animOffset), nextOffset);
+
+                    if (Has(Settings.SliceAnimations))
+                    {
+                        animations.Add(boneAnim.Name, animation);
+                    }
                 }
 
-                animOffset = nextOffset;
+                if (Has(Settings.SliceAnimations))
+                {
+                    animationFiles.Add(name + (i++), animations);
+                }
+                else
+                {
+                    animOffset = nextOffset;
+                }
             }
 
+        }
+
+        private COLLADA generateAnimationFile(Dictionary<string, SRTAnimation> animations, node skin)
+        {
+            var collada = new COLLADA()
+            {
+                asset = new asset()
+                {
+                    up_axis = UpAxisType.Y_UP,
+                    unit = new assetUnit() { meter = 1 }
+                }
+            };
+
+            collada.Items = new object[] { 
+                new library_visual_scenes() {
+                    visual_scene = new visual_scene[] {
+                        new visual_scene() {
+                            id = "scene",
+                            node = new node[]{
+                                skin
+                            }
+                        }
+                    }
+                },
+                new library_animations() {
+                    animation = animations.SelectMany((map) =>
+                    {
+                        return new animation[]{
+                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransX), SRTAnimation.Keys.TransX, map.Key),
+                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransY), SRTAnimation.Keys.TransY, map.Key),
+                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransZ), SRTAnimation.Keys.TransZ, map.Key),
+                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotX), SRTAnimation.Keys.RotX, map.Key),
+                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotY), SRTAnimation.Keys.RotY, map.Key),
+                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotZ), SRTAnimation.Keys.RotZ, map.Key),
+                      };
+                    }).ToArray()
+                }
+            };
+
+            collada.scene =
+                new COLLADAScene()
+                {
+                    instance_visual_scene = new InstanceWithExtra()
+                    {
+                        url = "#scene"
+                    }
+                };
+
+            return collada;
         }
 
         public void AddAnz(ANZFile file)
@@ -598,7 +674,8 @@ namespace Anzer
             //}));
             //sceneLib.visual_scene[0].node = nodes.ToArray();
 
-            nodes.AddRange(makeNodes(""));
+            var boneSkin = makeNodes("");
+            nodes.AddRange(boneSkin);
             sceneLib.visual_scene[0].node = nodes.ToArray();
 
 
@@ -637,20 +714,30 @@ namespace Anzer
             collada.scene.instance_visual_scene = new InstanceWithExtra() { url = "#scene" };
 
             collada.Save(file);
+
+
+            if (Has(Settings.SliceAnimations))
+            {
+                string baseName = file.Replace(".dae", "");
+
+                // Now let's take care of the animations...
+                var animEnum = animationFiles.GetEnumerator();
+                while (animEnum.MoveNext())
+                {
+                    string filename = baseName + "@" + animEnum.Current.Key + ".dae";
+                    var animationFile = generateAnimationFile(animEnum.Current.Value, boneSkin[0]);
+
+                    animationFile.Save(filename);
+                }
+            }
         }
 
 #endregion
 
 #region internal stuff
 
-        private int extractAnimations(ANZAnimData.Object anim, int offset)
+        private int extractAnimations(ANZAnimData.Object anim, SRTAnimation srt, int offset)
         {
-            if (!boneAnimMap.ContainsKey(anim.Name))
-            {
-                Console.Error.WriteLine("Couldn't find bone {0} for animating.", anim.Name);
-                return offset;
-            }
-            var srt = boneAnimMap[anim.Name];
             srt.BeginSection(offset);
 
             // Rot x, y, z

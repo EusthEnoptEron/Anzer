@@ -13,8 +13,9 @@ namespace Anzer
         Animations = 4,
         Morphs = 8,
         Merge = 16,
+        SliceAnimations = 32,
 
         None = 0,
-        All = Compatibility | Skin | Animations | Morphs | Merge
+        All = Compatibility | Skin | Animations | SliceAnimations | Morphs | Merge,
     }
 }

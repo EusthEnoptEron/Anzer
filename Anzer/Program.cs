@@ -60,8 +60,11 @@ namespace Anzer
                         case 'u':
                             settings |= Settings.Compatibility;
                             break;
-                        case 's':
+                        case 'b':
                             settings |= Settings.Skin;
+                            break;
+                        case 's':
+                            settings |= Settings.SliceAnimations;
                             break;
                         case 'm':
                             settings |= Settings.Morphs;
@@ -175,11 +178,15 @@ namespace Anzer
             Console.WriteLine();
             Console.WriteLine("-o file.dae      sets destination");
             Console.WriteLine("-f [dae|obj]     sets output format");
+            Console.WriteLine();
+            Console.WriteLine("Flags: (default is all)");
             Console.WriteLine("-m               exports morphs");
-            Console.WriteLine("-s               exports skins");
+            Console.WriteLine("-b               exports bones and skins");
             Console.WriteLine("-a               exports animations");
+            Console.WriteLine("-s               slices animations");
             Console.WriteLine("-c               merges sub meshes");
             Console.WriteLine("-u               optimize output for Unity");
+            Console.WriteLine();
             Console.WriteLine("-h               shows help");
         }
 
