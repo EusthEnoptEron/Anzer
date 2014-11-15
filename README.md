@@ -8,6 +8,8 @@ Anzer.exe [OPTIONS] file1.anz file2.anz ...
 
 -o file.dae      sets destination
 -f [dae|obj]     sets output format
+
+Flags: (default is all)
 -m               exports morphs
 -s               exports skins
 -a               exports animations
