@@ -102,6 +102,8 @@ namespace Anzer
             int i = 0;
             foreach (var anim in motion.Anims)
             {
+                if (anim.Objects == null) continue;
+
                 int nextOffset = animOffset;
                 Dictionary<string, SRTAnimation> animations = new Dictionary<string, SRTAnimation>();
                 foreach (var boneAnim in anim.Objects)
