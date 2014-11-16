@@ -11,10 +11,12 @@ Anzer.exe [OPTIONS] file1.anz file2.anz ...
 
 Flags: (default is all)
 -m               exports morphs
--s               exports skins
+-b               exports bones and skins
 -a               exports animations
+-s               slices animations
 -c               merges sub meshes
--u				 optimize output for Unity
+-u               optimize output for Unity
+
 -h               shows help
 ```
 
