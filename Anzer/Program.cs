@@ -12,6 +12,7 @@ namespace Anzer
 {
     class Program
     {
+
         static void Main(string[] args)
         {
             if (args.Length == 0 || args[0] == "-h")
@@ -141,7 +142,7 @@ namespace Anzer
             foreach (var file in fileList)
             {
                 var anz = ANZFile.FromFile(file);
-                if (!anz.HasAnimation)
+                if (!anz.HasAnimation || anz.Anims.Any(a => a.Objects == null || a.Objects.All(o => o.Name == null)))
                 {
                     Console.WriteLine("{0}: mesh", file);
 
