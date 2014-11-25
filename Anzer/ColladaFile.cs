@@ -62,12 +62,6 @@ namespace Anzer
 
         public float Scale { get; private set; }
         public float FPS { get; private set; }
-        public Settings Options = Settings.All;
-
-        private bool Has(Settings setting)
-        {
-            return (Options & setting) == setting;
-        }
 
         public ColladaFile(float scale = 0.01f, float fps = 30f )
         {
@@ -150,6 +144,7 @@ namespace Anzer
                 }
             };
 
+
             collada.Items = new object[] { 
                 new library_visual_scenes() {
                     visual_scene = new visual_scene[] {
@@ -164,14 +159,23 @@ namespace Anzer
                 new library_animations() {
                     animation = animations.SelectMany((map) =>
                     {
-                        return new animation[]{
-                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransX), SRTAnimation.Keys.TransX, map.Key),
-                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransY), SRTAnimation.Keys.TransY, map.Key),
-                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransZ), SRTAnimation.Keys.TransZ, map.Key),
-                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotX), SRTAnimation.Keys.RotX, map.Key),
-                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotY), SRTAnimation.Keys.RotY, map.Key),
-                          generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotZ), SRTAnimation.Keys.RotZ, map.Key),
-                      };
+                        IEnumerable<SRTAnimation.Keys> keys = ((SRTAnimation.Keys[])Enum.GetValues(typeof(SRTAnimation.Keys)));
+
+                        if(Has(Settings.Compress)) {
+                            //TODO: Filter by some condition
+                          //  keys = keys.Where(key => map.Value.GetFrames(key).Count() > 1);
+                           
+                        }
+
+                        return keys.Select(key => generateAnimation(map.Value.GetFrames(key), key, map.Key)).ToArray();
+                      //  return new animation[]{
+                      //    generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransX), SRTAnimation.Keys.TransX, map.Key),
+                      //    generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransY), SRTAnimation.Keys.TransY, map.Key),
+                      //    generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.TransZ), SRTAnimation.Keys.TransZ, map.Key),
+                      //    generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotX), SRTAnimation.Keys.RotX, map.Key),
+                      //    generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotY), SRTAnimation.Keys.RotY, map.Key),
+                      //    generateAnimation(map.Value.GetFrames(SRTAnimation.Keys.RotZ), SRTAnimation.Keys.RotZ, map.Key),
+                      //};
                     }).ToArray()
                 }
             };
@@ -601,7 +605,7 @@ namespace Anzer
             return geometries.ToArray();
         }
 
-        public void Save(string file)
+        public override void Save(string file)
         {
             var collada = new COLLADA();
             var dest = new FileInfo(file).Directory;
@@ -1291,7 +1295,7 @@ namespace Anzer
         }
 
 
-        public void AddMesh(ANZFile path)
+        public override void AddMesh(ANZFile path)
         {
             AddAnz(path);
         }

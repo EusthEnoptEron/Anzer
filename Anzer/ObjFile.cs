@@ -15,7 +15,7 @@ namespace Anzer
         private int offset = 1;
         private Dictionary<string, ANZTextureData> textures = new Dictionary<string, ANZTextureData>();
 
-        public void Save(string file)
+        public override void Save(string file)
         {
             var dest = new FileInfo(file).Directory;
 
@@ -43,7 +43,7 @@ namespace Anzer
 
         }
 
-        public void AddMesh(ANZFile file)
+        public override void AddMesh(ANZFile file)
         {
             float scale = 0.01f;
             //var anim = file.HasAnimation;

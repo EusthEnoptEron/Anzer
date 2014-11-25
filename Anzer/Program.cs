@@ -127,15 +127,17 @@ namespace Anzer
             }
             if (settings == Settings.None) settings = Settings.All;
 
+         //   settings = Settings.Animations | Settings.SliceAnimations | Settings.Compress;
 
             if (format == "") format = "dae";
 
-            var collada = new ColladaFile();
             dest = new FileInfo(dest.FullName + "." + format);
 
             IConvertTarget target;
             if (format == "dae") target = new ColladaFile();
             else target = new ObjFile();
+
+            target.Options = settings;
 
             int processed = 0;
 

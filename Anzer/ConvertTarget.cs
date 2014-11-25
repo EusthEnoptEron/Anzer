@@ -6,10 +6,17 @@ using System.Text;
 
 namespace Anzer
 {
-    interface IConvertTarget
+    public abstract class IConvertTarget
     {
-        void AddMesh(ANZFile path);
-        void Save(string file);
+        public abstract void AddMesh(ANZFile path);
+        public abstract void Save(string file);
+
+        public Settings Options = Settings.All;
+
+        protected bool Has(Settings setting)
+        {
+            return (Options & setting) == setting;
+        }
     }
 
     interface IMotionSupport

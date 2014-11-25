@@ -6,7 +6,7 @@ using System.Text;
 namespace Anzer
 {
     [Flags]
-    enum Settings
+    public enum Settings
     {
         Compatibility = 1,
         Skin = 2,
@@ -14,6 +14,7 @@ namespace Anzer
         Morphs = 8,
         Merge = 16,
         SliceAnimations = 32,
+        Compress = 64,
 
         None = 0,
         All = Compatibility | Skin | Animations | SliceAnimations | Morphs | Merge,
