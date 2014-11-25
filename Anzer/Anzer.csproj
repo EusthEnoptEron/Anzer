@@ -67,10 +67,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\..\tmp\collada_schema_1_4.cs">
-      <Link>collada_schema_1_4.cs</Link>
-    </Compile>
     <Compile Include="ColladaFile.cs" />
+    <Compile Include="collada_schema_1_4.cs" />
     <Compile Include="ConvertTarget.cs" />
     <Compile Include="Lerper.cs" />
     <Compile Include="ObjFile.cs" />
